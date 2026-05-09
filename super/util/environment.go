@@ -15,6 +15,6 @@ func GetEnv(key, fallback string) string {
 func GetURL() string {
 	var host = os.Getenv("APP_URL")
 	var port = os.Getenv("APP_PORT")
-	var url = host + port
-	return url
+	return host + ":" + port
+
 }
