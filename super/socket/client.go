@@ -6,9 +6,9 @@ import (
 	"log"
 	"time"
 
-	auth "github.com/nicklasjeppesen/going_internal/internal/super/auth"
+	auth "github.com/nicklasjeppesen/going_internal/super/auth"
 
-	struct_to_map "github.com/nicklasjeppesen/going_internal/internal/super/util"
+	struct_to_map "github.com/nicklasjeppesen/going_internal/super/util"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"

@@ -3,7 +3,7 @@ package socket
 import (
 	"net/http"
 
-	web "github.com/nicklasjeppesen/going_internal/internal/super/customweb"
+	web "github.com/nicklasjeppesen/going_internal/super/customweb"
 )
 
 //-----------------------------------------------------------------
