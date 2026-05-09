@@ -3,10 +3,11 @@ package unittest
 import (
 	"fmt"
 	"math/rand"
-	DB "myapp/internal/super/db"
-	. "myapp/internal/super/response"
 	"testing"
 	"time"
+
+	DB "github.com/nicklasjeppesen/going_internal/internal/super/db"
+	. "github.com/nicklasjeppesen/going_internal/internal/super/response"
 )
 
 // TestSimplCastingOfString test casting of a simple string into json format

@@ -2,13 +2,14 @@ package auth
 
 import (
 
-	//models "myapp/app/models/db"
+	//models "github.com/nicklasjeppesen/going_internal/app/models/db"
 
-	. "myapp/internal/super/db"
-	"myapp/internal/super/db/types"
-	. "myapp/internal/super/db/types"
-	"myapp/internal/super/security"
 	"net/http"
+
+	. "github.com/nicklasjeppesen/going_internal/internal/super/db"
+	"github.com/nicklasjeppesen/going_internal/internal/super/db/types"
+	. "github.com/nicklasjeppesen/going_internal/internal/super/db/types"
+	"github.com/nicklasjeppesen/going_internal/internal/super/security"
 )
 
 type IUser struct {

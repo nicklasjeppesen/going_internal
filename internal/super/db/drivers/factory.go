@@ -1,9 +1,9 @@
 package drivers
 
 import (
-	"myapp/internal/super/constants"
-	types "myapp/internal/super/db/types"
-	"myapp/internal/super/util"
+	"github.com/nicklasjeppesen/going_internal/internal/super/constants"
+	types "github.com/nicklasjeppesen/going_internal/internal/super/db/types"
+	"github.com/nicklasjeppesen/going_internal/internal/super/util"
 )
 
 /*

@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	//cors "myapp/config/cors"
+	//cors "github.com/nicklasjeppesen/going_internal/config/cors"
 	"net/http"
 )
 

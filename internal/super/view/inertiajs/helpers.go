@@ -6,12 +6,13 @@ import (
 	"html/template"
 	"log"
 
-	"myapp/internal/super/constants"
-	"myapp/internal/super/util"
 	"net/http"
 	"os"
 
-	struct_to_map "myapp/internal/super/util"
+	"github.com/nicklasjeppesen/going_internal/internal/super/constants"
+	"github.com/nicklasjeppesen/going_internal/internal/super/util"
+
+	struct_to_map "github.com/nicklasjeppesen/going_internal/internal/super/util"
 
 	"github.com/gorilla/sessions"
 )

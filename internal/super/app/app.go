@@ -4,15 +4,17 @@ import (
 	"context"
 	"embed"
 	"log"
-	Scheduler "myapp/internal/super/jobs"
-	"myapp/internal/super/view/inertiajs"
 
-	middleware "myapp/internal/super/middleware"
+	Scheduler "github.com/nicklasjeppesen/going_internal/internal/super/jobs"
+	"github.com/nicklasjeppesen/going_internal/internal/super/view/inertiajs"
+
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	middleware "github.com/nicklasjeppesen/going_internal/internal/super/middleware"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq" // PostgreSQL driver

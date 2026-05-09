@@ -3,12 +3,13 @@ package customweb
 import (
 	"fmt"
 	"log"
-	global "myapp/internal/super/global"
-	middlewarestdlib "myapp/internal/super/middleware"
-	"myapp/internal/super/request"
-	routeHelper "myapp/internal/super/route"
 	"net/http"
 	"regexp"
+
+	global "github.com/nicklasjeppesen/going_internal/internal/super/global"
+	middlewarestdlib "github.com/nicklasjeppesen/going_internal/internal/super/middleware"
+	"github.com/nicklasjeppesen/going_internal/internal/super/request"
+	routeHelper "github.com/nicklasjeppesen/going_internal/internal/super/route"
 )
 
 type Modifier func(w http.ResponseWriter, r *http.Request)

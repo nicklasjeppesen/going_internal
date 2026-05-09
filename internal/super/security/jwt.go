@@ -2,10 +2,11 @@ package security
 
 import (
 	"errors"
-	"myapp/internal/super/constants"
-	"myapp/internal/super/util"
 	"strconv"
 	"time"
+
+	"github.com/nicklasjeppesen/going_internal/internal/super/constants"
+	"github.com/nicklasjeppesen/going_internal/internal/super/util"
 
 	"github.com/golang-jwt/jwt/v5"
 )

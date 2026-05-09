@@ -6,16 +6,17 @@ import (
 	"fmt"
 	"log"
 	"maps"
-	. "myapp/internal/super/collections"
-	drivers "myapp/internal/super/db/drivers"
-	. "myapp/internal/super/db/types"
-	global "myapp/internal/super/global"
-	"myapp/internal/super/route"
-	struct_to_map "myapp/internal/super/util"
-	validation "myapp/internal/super/validation"
 	"net/http"
 	"reflect"
 	"time"
+
+	. "github.com/nicklasjeppesen/going_internal/internal/super/collections"
+	drivers "github.com/nicklasjeppesen/going_internal/internal/super/db/drivers"
+	. "github.com/nicklasjeppesen/going_internal/internal/super/db/types"
+	global "github.com/nicklasjeppesen/going_internal/internal/super/global"
+	"github.com/nicklasjeppesen/going_internal/internal/super/route"
+	struct_to_map "github.com/nicklasjeppesen/going_internal/internal/super/util"
+	validation "github.com/nicklasjeppesen/going_internal/internal/super/validation"
 )
 
 // Maybe a good idea?

@@ -2,7 +2,8 @@ package types
 
 import (
 	"database/sql"
-	. "myapp/internal/super/collections"
+
+	. "github.com/nicklasjeppesen/going_internal/internal/super/collections"
 )
 
 /*

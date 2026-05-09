@@ -1,8 +1,9 @@
 package socket
 
 import (
-	web "myapp/internal/super/customweb"
 	"net/http"
+
+	web "github.com/nicklasjeppesen/going_internal/internal/super/customweb"
 )
 
 //-----------------------------------------------------------------

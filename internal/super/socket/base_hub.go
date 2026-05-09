@@ -1,7 +1,7 @@
 package socket
 
 import (
-	"myapp/internal/super/channels"
+	"github.com/nicklasjeppesen/going_internal/internal/super/channels"
 )
 
 // https://programmingpercy.tech/blog/mastering-websockets-with-go/

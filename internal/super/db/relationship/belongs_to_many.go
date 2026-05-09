@@ -2,8 +2,9 @@ package relationship
 
 import (
 	"errors"
-	"myapp/internal/super/collections"
-	. "myapp/internal/super/db/types"
+
+	"github.com/nicklasjeppesen/going_internal/internal/super/collections"
+	. "github.com/nicklasjeppesen/going_internal/internal/super/db/types"
 )
 
 type BelongsToManyRelation[T IDBConnection[T]] struct {

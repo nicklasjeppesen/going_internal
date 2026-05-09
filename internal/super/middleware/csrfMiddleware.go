@@ -10,9 +10,10 @@ import (
 	"encoding/json"
 	"io"
 	"log"
-	constants "myapp/internal/super/constants"
 	"net/http"
 	"time"
+
+	constants "github.com/nicklasjeppesen/going_internal/internal/super/constants"
 )
 
 // More work is needed here: https://themsaid.com/csrf-protection-go-web-applications

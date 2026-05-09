@@ -7,9 +7,9 @@ import (
 	"os"
 	"sync"
 
-	auth "myapp/internal/super/auth"
-	channels "myapp/internal/super/channels"
-	constants "myapp/internal/super/constants"
+	auth "github.com/nicklasjeppesen/going_internal/internal/super/auth"
+	channels "github.com/nicklasjeppesen/going_internal/internal/super/channels"
+	constants "github.com/nicklasjeppesen/going_internal/internal/super/constants"
 
 	"github.com/gorilla/websocket"
 )

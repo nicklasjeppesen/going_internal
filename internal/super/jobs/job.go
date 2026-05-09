@@ -2,8 +2,9 @@ package jobs
 
 import (
 	"context"
-	channels "myapp/internal/super/channels"
 	"time"
+
+	channels "github.com/nicklasjeppesen/going_internal/internal/super/channels"
 )
 
 //-----------------------------------------------------------------

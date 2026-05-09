@@ -3,10 +3,11 @@ package db
 import (
 	"errors"
 	"fmt"
-	types "myapp/internal/super/db/types"
-	"myapp/internal/super/util"
 	"strings"
 	"time"
+
+	types "github.com/nicklasjeppesen/going_internal/internal/super/db/types"
+	"github.com/nicklasjeppesen/going_internal/internal/super/util"
 )
 
 // The base struct for all models.

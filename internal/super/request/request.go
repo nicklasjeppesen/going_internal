@@ -4,14 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	auth "myapp/internal/super/auth"
-	. "myapp/internal/super/result"
-	. "myapp/internal/super/validation"
 	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
 	"sync"
+
+	auth "github.com/nicklasjeppesen/going_internal/internal/super/auth"
+	. "github.com/nicklasjeppesen/going_internal/internal/super/result"
+	. "github.com/nicklasjeppesen/going_internal/internal/super/validation"
 )
 
 type Requestbase struct {

@@ -5,12 +5,13 @@ import (
 	"fmt"
 	fub "io/fs"
 	"log"
-	constants "myapp/internal/super/constants"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
 	"strings"
+
+	constants "github.com/nicklasjeppesen/going_internal/internal/super/constants"
 )
 
 func ViewRoter(router *http.ServeMux, embeddedFiles embed.FS) {

@@ -3,8 +3,9 @@ package response
 import (
 	"encoding/json"
 	"fmt"
-	. "myapp/internal/super/util"
 	"net/http"
+
+	. "github.com/nicklasjeppesen/going_internal/internal/super/util"
 )
 
 //

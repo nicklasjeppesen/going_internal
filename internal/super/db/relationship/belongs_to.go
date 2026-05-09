@@ -2,7 +2,8 @@ package relationship
 
 import (
 	"fmt"
-	. "myapp/internal/super/db/types"
+
+	. "github.com/nicklasjeppesen/going_internal/internal/super/db/types"
 )
 
 type BelongsTo[T IDBConnection[T]] struct {

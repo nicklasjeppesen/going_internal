@@ -1,4 +1,4 @@
-module myapp
+module github.com/nicklasjeppesen/going_internal
 
 go 1.25.2
 

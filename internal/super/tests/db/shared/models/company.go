@@ -1,9 +1,9 @@
 package models
 
 import (
-	. "myapp/internal/super/db"
-	drivers "myapp/internal/super/db/drivers"
-	. "myapp/internal/super/db/types"
+	. "github.com/nicklasjeppesen/going_internal/internal/super/db"
+	drivers "github.com/nicklasjeppesen/going_internal/internal/super/db/drivers"
+	. "github.com/nicklasjeppesen/going_internal/internal/super/db/types"
 )
 
 type Company struct {

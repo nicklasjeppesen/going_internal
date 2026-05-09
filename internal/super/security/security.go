@@ -4,9 +4,10 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"log"
-	"myapp/internal/super/constants"
 	"net/http"
 	"time"
+
+	"github.com/nicklasjeppesen/going_internal/internal/super/constants"
 
 	"golang.org/x/crypto/bcrypt"
 )

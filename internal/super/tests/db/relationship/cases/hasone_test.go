@@ -3,11 +3,12 @@ package cases
 import (
 	"fmt"
 	"log"
-	. "myapp/internal/super/tests/db/shared"
-	"myapp/internal/super/tests/db/shared/data"
-	model "myapp/internal/super/tests/db/shared/models"
-	schema "myapp/internal/super/tests/db/shared/schema"
 	"testing"
+
+	. "github.com/nicklasjeppesen/going_internal/internal/super/tests/db/shared"
+	"github.com/nicklasjeppesen/going_internal/internal/super/tests/db/shared/data"
+	model "github.com/nicklasjeppesen/going_internal/internal/super/tests/db/shared/models"
+	schema "github.com/nicklasjeppesen/going_internal/internal/super/tests/db/shared/schema"
 )
 
 func TestFirstOfHasOne(t *testing.T) {
