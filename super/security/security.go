@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/nicklasjeppesen/going_internal/internal/super/constants"
+	"github.com/nicklasjeppesen/going_internal/super/constants"
 
 	"golang.org/x/crypto/bcrypt"
 )

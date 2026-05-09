@@ -3,7 +3,7 @@ package types
 import (
 	"database/sql"
 
-	. "github.com/nicklasjeppesen/going_internal/internal/super/collections"
+	. "github.com/nicklasjeppesen/going_internal/super/collections"
 )
 
 /*

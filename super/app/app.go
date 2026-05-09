@@ -5,8 +5,8 @@ import (
 	"embed"
 	"log"
 
-	Scheduler "github.com/nicklasjeppesen/going_internal/internal/super/jobs"
-	"github.com/nicklasjeppesen/going_internal/internal/super/view/inertiajs"
+	Scheduler "github.com/nicklasjeppesen/going_internal/super/jobs"
+	"github.com/nicklasjeppesen/going_internal/super/view/inertiajs"
 
 	"net/http"
 	"os"
@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	middleware "github.com/nicklasjeppesen/going_internal/internal/super/middleware"
+	middleware "github.com/nicklasjeppesen/going_internal/super/middleware"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq" // PostgreSQL driver

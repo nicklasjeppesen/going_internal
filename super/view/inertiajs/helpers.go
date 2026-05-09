@@ -9,10 +9,10 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/nicklasjeppesen/going_internal/internal/super/constants"
-	"github.com/nicklasjeppesen/going_internal/internal/super/util"
+	"github.com/nicklasjeppesen/going_internal/super/constants"
+	"github.com/nicklasjeppesen/going_internal/super/util"
 
-	struct_to_map "github.com/nicklasjeppesen/going_internal/internal/super/util"
+	struct_to_map "github.com/nicklasjeppesen/going_internal/super/util"
 
 	"github.com/gorilla/sessions"
 )

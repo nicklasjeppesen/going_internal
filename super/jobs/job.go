@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	channels "github.com/nicklasjeppesen/going_internal/internal/super/channels"
+	channels "github.com/nicklasjeppesen/going_internal/super/channels"
 )
 
 //-----------------------------------------------------------------

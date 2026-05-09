@@ -3,12 +3,12 @@ package middleware
 import (
 	"context"
 
-	constants "github.com/nicklasjeppesen/going_internal/internal/super/constants"
+	constants "github.com/nicklasjeppesen/going_internal/super/constants"
 
 	//. "github.com/nicklasjeppesen/going_internal/internal/super/inertiajs"
 	"net/http"
 
-	security "github.com/nicklasjeppesen/going_internal/internal/super/security"
+	security "github.com/nicklasjeppesen/going_internal/super/security"
 )
 
 func JWTMiddleware(next http.HandlerFunc) http.HandlerFunc {

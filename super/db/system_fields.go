@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	types "github.com/nicklasjeppesen/going_internal/internal/super/db/types"
-	"github.com/nicklasjeppesen/going_internal/internal/super/util"
+	types "github.com/nicklasjeppesen/going_internal/super/db/types"
+	"github.com/nicklasjeppesen/going_internal/super/util"
 )
 
 // The base struct for all models.

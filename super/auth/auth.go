@@ -6,10 +6,10 @@ import (
 
 	"net/http"
 
-	. "github.com/nicklasjeppesen/going_internal/internal/super/db"
-	"github.com/nicklasjeppesen/going_internal/internal/super/db/types"
-	. "github.com/nicklasjeppesen/going_internal/internal/super/db/types"
-	"github.com/nicklasjeppesen/going_internal/internal/super/security"
+	. "github.com/nicklasjeppesen/going_internal/super/db"
+	"github.com/nicklasjeppesen/going_internal/super/db/types"
+	. "github.com/nicklasjeppesen/going_internal/super/db/types"
+	"github.com/nicklasjeppesen/going_internal/super/security"
 )
 
 type IUser struct {

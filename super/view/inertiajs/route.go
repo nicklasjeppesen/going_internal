@@ -11,7 +11,7 @@ import (
 	"os"
 	"strings"
 
-	constants "github.com/nicklasjeppesen/going_internal/internal/super/constants"
+	constants "github.com/nicklasjeppesen/going_internal/super/constants"
 )
 
 func ViewRoter(router *http.ServeMux, embeddedFiles embed.FS) {

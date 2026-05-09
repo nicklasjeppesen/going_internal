@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/nicklasjeppesen/going_internal/internal/super/constants"
-	"github.com/nicklasjeppesen/going_internal/internal/super/util"
+	"github.com/nicklasjeppesen/going_internal/super/constants"
+	"github.com/nicklasjeppesen/going_internal/super/util"
 
 	"github.com/golang-jwt/jwt/v5"
 )

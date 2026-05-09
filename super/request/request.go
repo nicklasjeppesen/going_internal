@@ -10,9 +10,9 @@ import (
 	"strings"
 	"sync"
 
-	auth "github.com/nicklasjeppesen/going_internal/internal/super/auth"
-	. "github.com/nicklasjeppesen/going_internal/internal/super/result"
-	. "github.com/nicklasjeppesen/going_internal/internal/super/validation"
+	auth "github.com/nicklasjeppesen/going_internal/super/auth"
+	. "github.com/nicklasjeppesen/going_internal/super/result"
+	. "github.com/nicklasjeppesen/going_internal/super/validation"
 )
 
 type Requestbase struct {

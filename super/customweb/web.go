@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"regexp"
 
-	global "github.com/nicklasjeppesen/going_internal/internal/super/global"
-	middlewarestdlib "github.com/nicklasjeppesen/going_internal/internal/super/middleware"
-	"github.com/nicklasjeppesen/going_internal/internal/super/request"
-	routeHelper "github.com/nicklasjeppesen/going_internal/internal/super/route"
+	global "github.com/nicklasjeppesen/going_internal/super/global"
+	middlewarestdlib "github.com/nicklasjeppesen/going_internal/super/middleware"
+	"github.com/nicklasjeppesen/going_internal/super/request"
+	routeHelper "github.com/nicklasjeppesen/going_internal/super/route"
 )
 
 type Modifier func(w http.ResponseWriter, r *http.Request)

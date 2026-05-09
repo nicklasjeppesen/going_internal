@@ -10,13 +10,13 @@ import (
 	"reflect"
 	"time"
 
-	. "github.com/nicklasjeppesen/going_internal/internal/super/collections"
-	drivers "github.com/nicklasjeppesen/going_internal/internal/super/db/drivers"
-	. "github.com/nicklasjeppesen/going_internal/internal/super/db/types"
-	global "github.com/nicklasjeppesen/going_internal/internal/super/global"
-	"github.com/nicklasjeppesen/going_internal/internal/super/route"
-	struct_to_map "github.com/nicklasjeppesen/going_internal/internal/super/util"
-	validation "github.com/nicklasjeppesen/going_internal/internal/super/validation"
+	. "github.com/nicklasjeppesen/going_internal/super/collections"
+	drivers "github.com/nicklasjeppesen/going_internal/super/db/drivers"
+	. "github.com/nicklasjeppesen/going_internal/super/db/types"
+	global "github.com/nicklasjeppesen/going_internal/super/global"
+	"github.com/nicklasjeppesen/going_internal/super/route"
+	struct_to_map "github.com/nicklasjeppesen/going_internal/super/util"
+	validation "github.com/nicklasjeppesen/going_internal/super/validation"
 )
 
 // Maybe a good idea?
