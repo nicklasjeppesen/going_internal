@@ -1,8 +1,8 @@
 package relationship
 
 import (
-	"github.com/nicklasjeppesen/going_internal/internal/super/collections"
-	. "github.com/nicklasjeppesen/going_internal/internal/super/db/types"
+	"github.com/nicklasjeppesen/going_internal/super/collections"
+	. "github.com/nicklasjeppesen/going_internal/super/db/types"
 )
 
 type HasManyRelation[T IDB[T]] struct {

@@ -3,7 +3,7 @@ package relationship
 import (
 	"fmt"
 
-	. "github.com/nicklasjeppesen/going_internal/internal/super/db/types"
+	. "github.com/nicklasjeppesen/going_internal/super/db/types"
 )
 
 /*

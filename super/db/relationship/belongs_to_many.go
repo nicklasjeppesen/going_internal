@@ -3,8 +3,8 @@ package relationship
 import (
 	"errors"
 
-	"github.com/nicklasjeppesen/going_internal/internal/super/collections"
-	. "github.com/nicklasjeppesen/going_internal/internal/super/db/types"
+	"github.com/nicklasjeppesen/going_internal/super/collections"
+	. "github.com/nicklasjeppesen/going_internal/super/db/types"
 )
 
 type BelongsToManyRelation[T IDBConnection[T]] struct {
