@@ -44,6 +44,10 @@ func (app App) Start() {
 
 	recoveryHandler := middleware.PanicRecovery(app.Router)
 
+	// Serve static files from the "assets" directory
+	fs := http.FileServer(http.Dir("internal/resources/assets"))
+	app.Router.Handle("GET /assets/", http.StripPrefix("/assets/", fs))
+
 	// add Inertia view routes if enabled
 	if app.WithInertiaView {
 		app.inertiaView(app.Router, app.EmbeddedFiles)
