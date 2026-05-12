@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	DB "github.com/nicklasjeppesen/going_internal/internal/super/db"
-	. "github.com/nicklasjeppesen/going_internal/internal/super/response"
+	DB "github.com/nicklasjeppesen/going_internal/super/db"
+	. "github.com/nicklasjeppesen/going_internal/super/response"
 )
 
 // TestSimplCastingOfString test casting of a simple string into json format

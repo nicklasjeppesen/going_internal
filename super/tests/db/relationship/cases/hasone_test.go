@@ -5,10 +5,10 @@ import (
 	"log"
 	"testing"
 
-	. "github.com/nicklasjeppesen/going_internal/internal/super/tests/db/shared"
-	"github.com/nicklasjeppesen/going_internal/internal/super/tests/db/shared/data"
-	model "github.com/nicklasjeppesen/going_internal/internal/super/tests/db/shared/models"
-	schema "github.com/nicklasjeppesen/going_internal/internal/super/tests/db/shared/schema"
+	. "github.com/nicklasjeppesen/going_internal/super/tests/db/shared"
+	"github.com/nicklasjeppesen/going_internal/super/tests/db/shared/data"
+	model "github.com/nicklasjeppesen/going_internal/super/tests/db/shared/models"
+	schema "github.com/nicklasjeppesen/going_internal/super/tests/db/shared/schema"
 )
 
 func TestFirstOfHasOne(t *testing.T) {
