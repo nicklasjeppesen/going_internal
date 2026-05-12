@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	constants "github.com/nicklasjeppesen/going_internal/super/constants"
@@ -62,34 +63,59 @@ func CsrfMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// reading the body
-		bodyBytes, err := io.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		r.Body.Close()
-
-		var input Input
-		err = json.Unmarshal(bodyBytes, &input)
-
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+		contentType := r.Header.Get("Content-Type")
+		var token string
+		if strings.HasPrefix(contentType, "application/json") {
+			token = CSRFTokenFromJson(w, r)
+		} else {
+			token = CSRFTokenFromHttp(w, r)
 		}
 
-		token := input.Csrf_token
 		if token == "" || token != cookie.Value {
 			http.Error(w, "Invalid CSRF token", http.StatusUnauthorized)
 			return
 		}
 
-		// Go's body is a stream, and when it read it is removed, so we have to put it back again. WHAT?
-		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-		// Token valid → Continue
 		next.ServeHTTP(w, r)
 
 	})
+}
+
+func CSRFTokenFromHttp(w http.ResponseWriter, r *http.Request) string {
+	// Standard HTML form request
+	err := r.ParseForm()
+	if err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
+		return ""
+	}
+
+	return r.FormValue(constants.Csrf_token)
+}
+
+func CSRFTokenFromJson(w http.ResponseWriter, r *http.Request) string {
+
+	// reading the body
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return ""
+	}
+	r.Body.Close()
+
+	var input Input
+	err = json.Unmarshal(bodyBytes, &input)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return ""
+	}
+
+	token := input.Csrf_token
+
+	// Go's body is a stream, and when it read it is removed, so we have to put it back again. WHAT?
+	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	// Token valid → Continue
+	return token
 }
 
 func generateToken() string {
