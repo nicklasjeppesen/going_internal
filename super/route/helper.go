@@ -38,7 +38,7 @@ func ConvertToStrings(interfaces []any) []string {
 	return strings
 }
 
-// ReplaceURLPlaceholders erstatter placeholders i URL'er med værdier fra en map.
+// ReplaceURLPlaceholders - replace placeholder in URL's with values from a map.
 // Returnerer fejl hvis en nøgle mangler.
 //
 //	example:

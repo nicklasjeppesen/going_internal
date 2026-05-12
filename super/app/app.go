@@ -21,16 +21,17 @@ import (
 )
 
 type App struct {
-	Router        *http.ServeMux
-	Scheduler     *Scheduler.Scheduler
-	EmbeddedFiles embed.FS
+	Router          *http.ServeMux
+	Scheduler       *Scheduler.Scheduler
+	EmbeddedFiles   embed.FS
+	UseTLS          bool // Set the flag during initialization
+	WithInertiaView bool
 }
 
-func NewApp(embeddedFiles embed.FS) *App {
+func NewApp() *App {
 	app := new(App)
 	app.Router = http.NewServeMux()
 	app.Scheduler = Scheduler.New()
-	app.EmbeddedFiles = embeddedFiles
 	app.LoadEnv()
 	return app
 }
@@ -43,8 +44,12 @@ func (app App) Start() {
 
 	recoveryHandler := middleware.PanicRecovery(app.Router)
 
+	// add Inertia view routes if enabled
+	if app.WithInertiaView {
+		app.inertiaView(app.Router, app.EmbeddedFiles)
+	}
+
 	// 2. Setup HTTP layer
-	app.RegisterRoutes(app.Router, app.EmbeddedFiles)
 	server := &http.Server{
 		Addr:    getPort(),
 		Handler: recoveryHandler,
@@ -52,8 +57,17 @@ func (app App) Start() {
 
 	// 3. Start server
 	go func() {
+
 		log.Printf("Server running at %s:%s", os.Getenv("APP_URL"), os.Getenv("APP_PORT"))
-		if err := server.ListenAndServeTLS("cert.pem", "key.pem"); err != nil && err != http.ErrServerClosed {
+		var err error
+		if app.UseTLS {
+			// Ensure cert.pem and key.pem exist in your root or provide paths via ENV
+			err = server.ListenAndServeTLS("cert.pem", "key.pem")
+		} else {
+			err = server.ListenAndServe()
+		}
+
+		if err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to start server: %v", err)
 		}
 	}()
@@ -92,8 +106,7 @@ func GetURl() string {
 	return url
 }
 
-func (app App) RegisterRoutes(router *http.ServeMux, embeddedFiles embed.FS) {
-
+func (app App) inertiaView(router *http.ServeMux, embeddedFiles embed.FS) {
 	inertiajs.ViewRoter(router, embeddedFiles)
 
 }

@@ -189,48 +189,6 @@ func (belong *BelongsToManyRelation[T]) getRelations(pivots []map[string]any) ma
 	return resultsSet
 }
 
-/*
-- Options for parsing in values:
-- - Attach(userid any)
-- - Attach(userid1, userid2 any)
-- - Attach(userid any, ["pivots_column1" : value, "pivots_column2" : value2])
-
-  - Attach (
-    [
-    "userid1" : ["pivots_column1" : value, "pivots_column2" : value2],
-    "userid2" : ["pivots_column1" : value, "pivots_column2" : value2],
-
-    ])
-*/
-/*
-func (belong *BelongsToManyRelation[T]) Attach(inputs ...any) error {
-
-	if len(inputs) == 0 {
-		return errors.New("No input")
-	}
-	switch a := inputs[0].(type) {
-	case string, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
-		if len(inputs) > 1 {
-			if pivots, ok := inputs[1].(map[string]any); ok {
-				belong.attach(map[any]map[string]any{a: pivots})
-			} else {
-				// List if Id's
-				values := map[any]map[string]any{}
-				for _, id := range inputs {
-					values[id] = nil
-				}
-				belong.attach(values)
-				return nil
-			}
-		} else {
-			belong.attach(map[any]map[string]any{a: nil})
-		}
-	case map[any]map[string]any:
-		belong.attach(a)
-	}
-	return nil
-}*/
-
 type PivotData map[string]any
 
 // Takes two types of inputs:

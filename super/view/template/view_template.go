@@ -9,7 +9,7 @@ import (
 // Assume the views are the in folder: ressources/views/
 /*
 func (c *SampleController) RenderHome() Result {
-	return miniView("home.templ",
+	return View("home",
 		Params{"Title": "Min forside"})
 }
 */
@@ -17,11 +17,10 @@ func (c *SampleController) RenderHome() Result {
 func View(tmplView string, data map[string]interface{}) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		//tmplPath := filepath.Join("resources", "views", "home.templ")
 		// Parse templaten
-		tmpl, err := template.ParseFiles("resources/views/" + tmplView)
+		tmpl, err := template.ParseFiles("internal/resources/views/" + tmplView + ".template")
 		if err != nil {
-			http.Error(w, "Template ikke fundet: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "Template view was not found: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		// Send result to browseren

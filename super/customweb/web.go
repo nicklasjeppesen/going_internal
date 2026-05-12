@@ -240,24 +240,6 @@ func (router *MyRouter) GroupsWithMiddleware(basePath string, middleware middlew
 	}
 }
 
-/*
-// Check if this is not needed, used to be replaced with chain
-func wrapMiddlewares(controller http.HandlerFunc, middleware middlewarestdlib.MiddlewareGroup) http.HandlerFunc {
-	return chain(controller, middleware)
-}
-*/
-
-// createFunc
-//
-// Takes the type mod and transform it into a similar type,
-// This is because of Gos lack of covariance
-/*
-func createFunc(mod Modifier) func(w http.ResponseWriter, r *http.Request) {
-	return func(a http.ResponseWriter, b *http.Request) {
-		mod(a, b)
-	}
-}*/
-
 // Chain
 //
 // applies a series of middleware to a handler
