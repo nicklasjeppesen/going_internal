@@ -83,7 +83,7 @@ func CsrfMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 func CSRFTokenFromHttp(w http.ResponseWriter, r *http.Request) string {
 	// Standard HTML form request
-	err := r.ParseForm()
+	err := r.ParseMultipartForm(32 << 20) // 32MB max memory
 	if err != nil {
 		http.Error(w, "Invalid form", http.StatusBadRequest)
 		return ""
