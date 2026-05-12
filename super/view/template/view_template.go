@@ -20,7 +20,9 @@ func View(tmplView string, data map[string]interface{}) func(http.ResponseWriter
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Parse templaten
-		tmpl, err := template.ParseFiles("internal/resources/views/" + tmplView + ".template")
+		tmpl, err := template.ParseFiles(
+			"internal/resources/views/base.template",
+			"internal/resources/views/"+tmplView+".template")
 		if err != nil {
 			http.Error(w, "Template view was not found: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -31,6 +33,7 @@ func View(tmplView string, data map[string]interface{}) func(http.ResponseWriter
 
 		data[constants.Csrf_token] = r.Context().Value(constants.Csrf_token)
 		// Send result to browseren
-		tmpl.Execute(w, data)
+		//tmpl.Execute(w, data)
+		tmpl.ExecuteTemplate(w, "base", data)
 	}
 }

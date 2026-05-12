@@ -51,6 +51,21 @@ func (r *Requestbase) Validate(body interface{}) (bool, string) {
 	return Validate(body)
 }
 
+func (r *Requestbase) FormValue(key string) string {
+	return r.R.FormValue(key)
+}
+
+func (r *Requestbase) GetInputs() map[string]interface{} {
+	data := make(map[string]interface{})
+
+	for key, values := range r.R.Form {
+		for _, value := range values {
+			data[key] = value
+		}
+	}
+	return data
+}
+
 /**
 * Create a request struct, and try to parse the
 * request body to the given T type.
