@@ -3,6 +3,8 @@ package template
 import (
 	"net/http"
 	"text/template"
+
+	"github.com/nicklasjeppesen/going_internal/super/constants"
 )
 
 // How to use
@@ -23,6 +25,7 @@ func View(tmplView string, data map[string]interface{}) func(http.ResponseWriter
 			http.Error(w, "Template view was not found: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+		data[constants.Csrf_token] = r.Context().Value(constants.Csrf_token)
 		// Send result to browseren
 		tmpl.Execute(w, data)
 	}
