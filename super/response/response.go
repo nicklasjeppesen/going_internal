@@ -49,3 +49,21 @@ func (c *Response) Print(_v any) func(http.ResponseWriter, *http.Request) {
 		fmt.Fprintln(w, _v)
 	}
 }
+
+func (c *Response) Redirect(Url string) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, Url, 302)
+	}
+}
+
+func (c *Response) Back(Url string) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		referer := r.Referer()
+
+		if referer == "" {
+			// fallback hvis browseren ikke sender Referer
+			referer = "/"
+		}
+		http.Redirect(w, r, referer, http.StatusSeeOther)
+	}
+}
