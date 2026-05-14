@@ -1,0 +1,10 @@
+package controller
+
+type {{.Model}} struct {
+	ControllerBase
+}
+
+func (c *{{.Model}}) Home() Result {
+	return View("index", Params{"Title": "Going App", "Message": "Welcome to Going"})
+
+}

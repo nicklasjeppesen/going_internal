@@ -31,14 +31,11 @@ type DBCreator struct {
 	ConnectionString string
 }
 
+type IConcern[A IConcern[A]] interface {
+	IDBConnection[A]
+}
+
 // Type for concern pattern
-type Concern struct {
-	IRepository
+type Concern[A IConcern[A]] struct {
+	IConcern[A]
 }
-
-// Basis where Clasue for simple where statements
-func (concern *Concern) Where(column string, condition ...any) {
-	concern.WhereInNonGeneric(column, condition)
-}
-
-// TODO: Implement relations Functions TO Concern
