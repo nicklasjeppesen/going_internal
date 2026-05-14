@@ -15,7 +15,7 @@ var resource bool // Variabel til at gemme flag-værdien
 var ControllerCmd = &cobra.Command{
 	GroupID: groups.GeneratorGroup.ID,
 	Args:    cobra.MinimumNArgs(1),
-	Use:     "Controller [controllerName]",
+	Use:     "controller [controllerName]",
 	Short:   "Create a new controller class - ex. Controller HomeController",
 	Long:    `Create a new controller class - ex. Controller HomeController`,
 
