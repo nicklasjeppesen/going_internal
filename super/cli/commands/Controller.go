@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var resource bool // Variabel til at gemme flag-værdien
+var resource bool // Variabel to represent ressource flag
 
 // ControllerCmd represents the Controller command
 var ControllerCmd = &cobra.Command{
