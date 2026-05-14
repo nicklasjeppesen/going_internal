@@ -1,0 +1,29 @@
+package controller
+
+type {{.Model}} struct {
+	ControllerBase
+}
+
+func (c *{{.Model}}) Index() Result {
+	return View("{{.Name}}/index", Params{"Title": "Going App", "Message": "Welcome to Going"})
+}
+
+func (c *{{.Model}}) Create() Result {
+	return View("{{.Name}}/create", nil)
+}
+
+func (c *{{.Model}}) Store(r Request) Result {
+	return View("{{.Name}}/index", nil)
+}
+
+func (c *{{.Model}}) Show(id int) Result {
+	return View("{{.Name}}/show", nil)
+}
+
+func (c *{{.Model}}) Update() Result {
+	return View("{{.Name}}/show", nil)
+}
+
+func (c *{{.Model}}) destroy() Result {
+	return View("{{.Name}}/index", nil)
+}
