@@ -28,4 +28,7 @@ type IDrivers interface {
 	First_(_db *sql.DB, columns []string) []any // returning columns
 	Update_(_db *sql.DB, columns []string, values []any)
 	Delete_(_db *sql.DB, id any) error
+
+	// support functions
+	CreateMigrationTable() string
 }

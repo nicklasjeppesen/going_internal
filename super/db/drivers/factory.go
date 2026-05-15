@@ -13,12 +13,21 @@ import (
  */
 func DefaultDBConnection() types.DBCreator {
 	var DBConnection = util.GetEnv(constants.DB_CONNECTION, "")
-	switch DBConnection {
-	case "SQLite":
+	return GetDBConnection(DBConnection)
+}
+
+/*
+*
+* Return the default DB connnection based on the env file
+* Maybe this should be removed to factory in Driver
+ */
+func GetDBConnection(driver string) types.DBCreator {
+	switch driver {
+	case "sqlite":
 		return CreateSQLite()
 	case "Postgres":
 		return CreatePostgressDB()
 	default:
-		return CreateSQLite()
+		panic("No database driver exists")
 	}
 }

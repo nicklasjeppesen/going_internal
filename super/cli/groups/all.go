@@ -7,4 +7,8 @@ var (
 		ID:    "generation",
 		Title: "Make Commands",
 	}
+	MigrateGroup = &cobra.Group{
+		ID:    "Migrate",
+		Title: "Migrate",
+	}
 )

@@ -329,3 +329,13 @@ func (parent *PostgresDB) OffSet_(max int) {
 	parent.withOffSet = true
 	parent.offSet = max
 }
+
+func (parent *PostgresDB) CreateMigrationTable() string {
+	return `
+		CREATE TABLE IF NOT EXISTS migrations (
+			id SERIAL PRIMARY KEY,
+			filename TEXT UNIQUE NOT NULL,
+			applied_at TIMESTAMP NOT NULL DEFAULT now()
+		);
+	`
+}

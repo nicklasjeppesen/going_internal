@@ -11,6 +11,7 @@ func GetGroups() []*cobra.Group {
 
 	return []*cobra.Group{
 		groups.GeneratorGroup,
+		groups.MigrateGroup,
 	}
 }
 
@@ -18,5 +19,6 @@ func GetCommands() []*cobra.Command {
 	return []*cobra.Command{
 		commands.ControllerCmd,
 		commands.ModelCmd,
+		commands.MigrateCmd,
 	}
 }

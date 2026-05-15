@@ -346,3 +346,13 @@ func (parent *SQLite) OffSet_(max int) {
 	parent.withOffSet = true
 	parent.offSet = max
 }
+
+func (parent *SQLite) CreateMigrationTable() string {
+	return `
+		CREATE TABLE IF NOT EXISTS migrations (
+			id INTEGER PRIMARY key,
+			filename TEXT UNIQUE NOT NULL,
+			applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		);
+	`
+}
