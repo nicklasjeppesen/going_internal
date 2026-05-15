@@ -2,6 +2,7 @@ package cli
 
 import (
 	commands "github.com/nicklasjeppesen/going_internal/super/cli/commands"
+	migrate "github.com/nicklasjeppesen/going_internal/super/cli/commands/migrate"
 	groups "github.com/nicklasjeppesen/going_internal/super/cli/groups"
 
 	"github.com/spf13/cobra"
@@ -19,6 +20,6 @@ func GetCommands() []*cobra.Command {
 	return []*cobra.Command{
 		commands.ControllerCmd,
 		commands.ModelCmd,
-		commands.MigrateCmd,
+		migrate.MigrateCmd,
 	}
 }
