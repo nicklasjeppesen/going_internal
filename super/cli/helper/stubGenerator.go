@@ -6,8 +6,6 @@ import (
 	"io/fs"
 	"log"
 	"os"
-	"path/filepath"
-	"runtime"
 	"text/template"
 )
 
@@ -46,14 +44,13 @@ type StubDetails struct {
 
 func (s *StubDetails) CreateStub() {
 
-	_, filename, _, _ := runtime.Caller(0)
+	//_, filename, _, _ := runtime.Caller(0)
 	// 'filename' er nu den absolutte sti til den .go fil, der kører koden
-	basePath := filepath.Dir(filename)
+	//basePath := filepath.Dir(filename)
 	//fullPath := filepath.Join(basePath, "data.txt")
-
-	println(basePath)
-
+	//println(basePath)
 	//contentsBuff, err := os.ReadFile(s.Name)
+
 	contentsBuff, err := GetTemplate(s.Name)
 
 	if err != nil {

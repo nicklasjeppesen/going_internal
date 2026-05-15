@@ -12,9 +12,9 @@ var resource bool // Variabel to represent ressource flag
 var ControllerCmd = &cobra.Command{
 	GroupID: groups.GeneratorGroup.ID,
 	Args:    cobra.MinimumNArgs(1),
-	Use:     "controller [controllerName]",
-	Short:   "Create a new controller class - ex. Controller HomeController",
-	Long:    `Create a new controller class - ex. Controller HomeController`,
+	Use:     "make:controller [controllerName]",
+	Short:   "Create a new controller class - ex. make:controller HomeController",
+	Long:    `Create a new controller class - ex. make:controller HomeController`,
 
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
