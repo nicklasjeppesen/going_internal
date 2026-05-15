@@ -13,29 +13,29 @@ var ControllerCmd = &cobra.Command{
 	GroupID: groups.GeneratorGroup.ID,
 	Args:    cobra.MinimumNArgs(1),
 	Use:     "make:controller [controllerName]",
-	Short:   "Create a new controller class - ex. make:controller HomeController",
-	Long:    `Create a new controller class - ex. make:controller HomeController`,
+	Short:   "Create a new controller class - ex. make:controller Home",
+	Long:    `Create a new controller class - ex. make:controller Home`,
+	Run:     CreateController,
+}
 
-	Run: func(cmd *cobra.Command, args []string) {
-		name := args[0]
+func CreateController(cmd *cobra.Command, args []string) {
+	name := args[0]
 
-		stubPath := "controller/controller.go.stub"
-		if resource {
-			stubPath = "controller/controllerRessource.go.stub"
-		}
+	stubPath := "controller/controller.go.stub"
+	if resource {
+		stubPath = "controller/controllerRessource.go.stub"
+	}
 
-		stub := helper.StubDetails{
-			Name:        stubPath,
-			FileName:    name + "Controller.go",
-			Destination: "./internal/app/http/controller/",
-			Values: map[string]string{
-				"Model": name + "Controller",
-				"Name":  name,
-			},
-		}
-		stub.CreateStub()
-
-	},
+	stub := helper.StubDetails{
+		Name:        stubPath,
+		FileName:    name + "Controller.go",
+		Destination: "./internal/app/http/controller/",
+		Values: map[string]string{
+			"Model": FirstUpper(name) + "Controller",
+			"Name":  name,
+		},
+	}
+	stub.CreateStub()
 }
 
 func init() {
