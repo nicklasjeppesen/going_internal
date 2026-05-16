@@ -29,7 +29,7 @@ func CreateController(cmd *cobra.Command, args []string) {
 
 	stub := stubs.StubDetails{
 		Name:        stubPath,
-		FileName:    name + "Controller.go",
+		FileName:    name + "_controller.go",
 		Destination: "./internal/app/http/controller/",
 		Values: map[string]string{
 			"Model": helper.FirstUpper(name) + "Controller",
