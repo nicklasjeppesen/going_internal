@@ -181,7 +181,13 @@ func (dbsys *SystemFields) GetKeys() []string {
 // Data getter and setter for the default columns
 func (dbsys *SystemFields) SystemMapper() types.DBMapper {
 	var holder = map[string]types.ValueHolder{
-		"id":         {Getter: func() any { return dbsys.Id }, Setter: func(val any) { dbsys.Id = val.(int64) }},
+		"id": {Getter: func() any {
+			if dbsys.Id == int64(0) {
+				return nil
+			} else {
+				return dbsys.Id
+			}
+		}, Setter: func(val any) { dbsys.Id = val.(int64) }},
 		"created_at": {Getter: func() any { return dbsys.Created_at }, Setter: func(val any) { dbsys.Created_at = val.(time.Time) }},
 		"updated_at": {Getter: func() any { return dbsys.Updated_at }, Setter: func(val any) { dbsys.Updated_at = val.(time.Time) }},
 		"pivots": {Getter: func() any { return dbsys.Pivots }, SetterMap: func(key string, value any) {
@@ -301,7 +307,6 @@ func f(ptr any) types.ValueHolder {
 				fmt.Println("Kunne ikke finde setter type")
 				return
 			}
-
 		},
 	}
 }
