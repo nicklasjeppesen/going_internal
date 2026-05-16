@@ -25,5 +25,6 @@ func GetCommands() []*cobra.Command {
 		migration.MigrationCmd,
 		commands.HubCmd,
 		commands.MiddlewareCmd,
+		commands.JobsCmd,
 	}
 }
