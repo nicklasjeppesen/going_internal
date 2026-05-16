@@ -182,7 +182,7 @@ func (dbsys *SystemFields) GetKeys() []string {
 func (dbsys *SystemFields) SystemMapper() types.DBMapper {
 	var holder = map[string]types.ValueHolder{
 		"id": {Getter: func() any {
-			if dbsys.Id == int64(0) {
+			if IsDefaultGeneric(dbsys.Id) {
 				return nil
 			} else {
 				return dbsys.Id
@@ -198,6 +198,12 @@ func (dbsys *SystemFields) SystemMapper() types.DBMapper {
 		}},
 	}
 	return types.DBMapper{ValueHolder: holder}
+}
+
+// Check if unknown type, is equal to its default value (kind of nil)
+func IsDefaultGeneric[T comparable](v T) bool {
+	var zero T
+	return v == zero
 }
 
 // Return default system columns
