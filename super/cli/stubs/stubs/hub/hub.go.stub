@@ -30,3 +30,13 @@ func ({{.Name}} *{{.Model}}) handleNewMessage(parameters []string, client *socke
 func ({{.Name}} *{{.Model}}) CancleConnecetion(client *socket.Client) {
 	fmt.Println("User cancle the connection")
 }
+
+// Handle message send from the app
+func ({{.Name}} *{{.Model}}) AppReceiver(message channels.Socket) {
+
+	fmt.Println("MessageHub Just Got a message from The Internal app")
+	if client, ok := MessageHub.Clients["1"]; ok {
+		fmt.Println("Found a client")
+		client.SendMessage("sendMessage", "Congrats, you just became a father")
+	}
+}
