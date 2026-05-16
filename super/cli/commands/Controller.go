@@ -14,8 +14,8 @@ var ControllerCmd = &cobra.Command{
 	GroupID: groups.GeneratorGroup.ID,
 	Args:    cobra.MinimumNArgs(1),
 	Use:     "make:controller [controllerName]",
-	Short:   "Create a new controller class - ex. make:controller Home",
-	Long:    `Create a new controller class - ex. make:controller Home`,
+	Short:   "Create a new controller struct - ex. make:controller Home",
+	Long:    `Create a new controller struct - ex. make:controller Home`,
 	Run:     CreateController,
 }
 

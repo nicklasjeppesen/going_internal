@@ -15,8 +15,8 @@ var ModelCmd = &cobra.Command{
 	GroupID: groups.GeneratorGroup.ID,
 	Args:    cobra.MinimumNArgs(1),
 	Use:     "make:model [modelName]",
-	Short:   "Create a new model class - ex. make:model Home",
-	Long:    `Create a new model class - ex. make:model Home`,
+	Short:   "Create a new model struct - ex. make:model Home",
+	Long:    `Create a new model struct - ex. make:model Home`,
 	Run:     CreateModel,
 }
 

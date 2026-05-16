@@ -1,0 +1,32 @@
+package hubs
+
+import (
+	"fmt"
+
+	socket "github.com/nicklasjeppesen/going_internal/super/socket"
+)
+
+type {{.Model}} struct {
+	socket.BaseHub
+}
+
+/*
+- Register the routes for the chat hub
+*/
+func ({{.Name}} *{{.Model}}) RegisterRoutes() {
+
+	{{.Name}}.On("new_message", {{.Name}}.handleNewMessage)
+	// {{.Name}}.On("other_event", {{.Name}}.handleOtherEvent)
+}
+
+func ({{.Name}} *{{.Model}}) handleNewMessage(parameters []string, client *socket.Client) error {
+	client.SendMessage("new_message", "Thank you for your message")
+	return nil
+}
+
+/*
+- handler when user is cancle a connection
+*/
+func ({{.Name}} *{{.Model}}) CancleConnecetion(client *socket.Client) {
+	fmt.Println("User cancle the connection")
+}
