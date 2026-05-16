@@ -1,0 +1,16 @@
+package middleware
+
+import (
+	"net/http"
+)
+
+// AuthMiddleware checks for a valid authentication token
+func {{.Model}}(next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		// check for conditions
+
+		// Pass middleare, continue
+		next.ServeHTTP(w, r)
+	})
+}
