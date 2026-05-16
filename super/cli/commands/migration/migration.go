@@ -6,6 +6,7 @@ import (
 
 	groups "github.com/nicklasjeppesen/going_internal/super/cli/groups"
 	helper "github.com/nicklasjeppesen/going_internal/super/cli/helper"
+	stubs "github.com/nicklasjeppesen/going_internal/super/cli/stubs"
 	"github.com/nicklasjeppesen/going_internal/super/util"
 	"github.com/spf13/cobra"
 )
@@ -27,47 +28,16 @@ func CreateMigration(cmd *cobra.Command, args []string) {
 	driver := util.GetEnv("DB_CONNECTION", "")
 	stubPath := "migration/migration_" + driver + ".sql.stub"
 
-	stub := helper.StubDetails{
+	stub := stubs.StubDetails{
 		Name:        stubPath,
 		FileName:    timestamp + "_" + name + ".sql",
 		Destination: "./internal/database/migrations/scripts/",
 		Values: map[string]string{
-			"Model": TextToMultiplum(strings.ToLower(name)),
+			"Model": helper.TextToMultiplum(strings.ToLower(name)),
 			"Name":  name,
 		},
 	}
 	stub.CreateStub()
-}
-
-func TextToMultiplum(text string) string {
-	text = strings.TrimSpace(text)
-	if len(text) < 2 {
-		if text == "y" {
-			return "ies"
-		}
-		if text == "s" {
-			return text
-		}
-		return text + "s"
-	}
-
-	//
-	if strings.HasSuffix(text, "y") {
-		lastLetterIdx := len(text) - 1
-		nextlastLetterIdx := string(text[lastLetterIdx-1])
-
-		if strings.ContainsAny(nextlastLetterIdx, "aeiouAEIOU") {
-			return text + "s"
-		}
-
-		return text[:lastLetterIdx] + "ies"
-	}
-
-	if strings.HasSuffix(text, "s") {
-		return text
-	}
-
-	return text + "s"
 }
 
 func init() {

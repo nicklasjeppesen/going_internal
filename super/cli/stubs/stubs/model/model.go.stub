@@ -13,7 +13,7 @@ type {{.Model}} struct {
 // Create a DB object for DB actions
 func (_{{.variableName}} {{.Model}}) DB() *{{.Model}} {
 	{{.variableName}} := &_{{.variableName}}
-	{{.variableName}}.Table = "{{.variableName}}"
+	{{.variableName}}.Table = "{{.tableName}}"
 	{{.variableName}}.Columns = {{.variableName}}.columns()
 	{{.variableName}}.ParentDB = CreateORM({{.variableName}})
 	return {{.variableName}}

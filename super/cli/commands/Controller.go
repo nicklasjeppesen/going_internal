@@ -3,6 +3,7 @@ package commands
 import (
 	groups "github.com/nicklasjeppesen/going_internal/super/cli/groups"
 	helper "github.com/nicklasjeppesen/going_internal/super/cli/helper"
+	stubs "github.com/nicklasjeppesen/going_internal/super/cli/stubs"
 	"github.com/spf13/cobra"
 )
 
@@ -26,12 +27,12 @@ func CreateController(cmd *cobra.Command, args []string) {
 		stubPath = "controller/controllerRessource.go.stub"
 	}
 
-	stub := helper.StubDetails{
+	stub := stubs.StubDetails{
 		Name:        stubPath,
 		FileName:    name + "Controller.go",
 		Destination: "./internal/app/http/controller/",
 		Values: map[string]string{
-			"Model": FirstUpper(name) + "Controller",
+			"Model": helper.FirstUpper(name) + "Controller",
 			"Name":  name,
 		},
 	}
