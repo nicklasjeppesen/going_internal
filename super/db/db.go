@@ -107,13 +107,10 @@ func (parent *ParentDB[T]) addRoutes(data []T) []T {
 
 }
 
-/*
-* Execute a raw select query, and return the result as a 2D array
- */
-func (parent *ParentDB[T]) Select(query string) ([][]any, error) {
+// Execute a raw select query, and return the result
+func (parent *ParentDB[T]) Select(query string) ([]map[string]any, error) {
 
 	var conn = parent.DbConn()
-
 	defer conn.Close()
 
 	rows, err := conn.Query(query)
@@ -122,11 +119,11 @@ func (parent *ParentDB[T]) Select(query string) ([][]any, error) {
 		fmt.Println("Error getting rows")
 	}
 
-	var mylist [][]any
+	var columns, _ = rows.Columns()
+	records := []map[string]any{}
 
 	for rows.Next() {
-		var columns, _ = rows.Columns()
-		values := make([]any, len(columns))
+		var values = make([]any, len(columns))
 		for i := range values {
 			values[i] = new(any) // create addressable placeholder
 		}
@@ -139,9 +136,14 @@ func (parent *ParentDB[T]) Select(query string) ([][]any, error) {
 		}
 		if err != nil {
 			log.Fatal(err)
-			fmt.Println("Error getting rows2")
+			fmt.Println("Error getting rows")
 		}
-		mylist = append(mylist, values)
+		record := make(map[string]any, len(columns))
+		for i, value := range values {
+			record[columns[i]] = value
+		}
+
+		records = append(records, record)
 	}
 
 	// Check for error during iteration
@@ -149,7 +151,7 @@ func (parent *ParentDB[T]) Select(query string) ([][]any, error) {
 		log.Fatal(err)
 	}
 
-	return mylist, nil
+	return records, nil
 }
 
 func (parent *ParentDB[T]) With(relation ...string) T {
