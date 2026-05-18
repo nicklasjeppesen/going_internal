@@ -170,12 +170,12 @@ func (parent *ParentDB[T]) SetDbConn(conn *sql.DB) {
 	parent.dbconn = conn
 }
 
-func (parent *ParentDB[T]) Ignorevalidation() IDB[T] {
+func (parent *ParentDB[T]) Ignorevalidation() T {
 	parent.ignorevalidation = true
 	return *parent.dbChild
 }
 
-func (parent *ParentDB[T]) Or(column string, value any) IDB[T] {
+func (parent *ParentDB[T]) Or(column string, value any) T {
 	parent.Creator.Driver.Or_(column, value)
 	return *parent.dbChild
 }
