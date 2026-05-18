@@ -68,7 +68,7 @@ func CsrfMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		if strings.HasPrefix(contentType, "application/json") {
 			token = CSRFTokenFromJson(w, r)
 		} else {
-			token = CSRFTokenFromHttp(w, r)
+			token = CSRFTokenFromHttp(w, r, contentType)
 		}
 
 		if token == "" || token != cookie.Value {
@@ -81,12 +81,14 @@ func CsrfMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	})
 }
 
-func CSRFTokenFromHttp(w http.ResponseWriter, r *http.Request) string {
+func CSRFTokenFromHttp(w http.ResponseWriter, r *http.Request, contentType string) string {
 	// Standard HTML form request
-	err := r.ParseMultipartForm(32 << 20) // 32MB max memory
-	if err != nil {
-		http.Error(w, "Invalid form", http.StatusBadRequest)
-		return ""
+	if contentType == "multipart/form-data" {
+		err := r.ParseMultipartForm(32 << 20) // 32MB max memory
+		if err != nil {
+			http.Error(w, "Invalid form", http.StatusBadRequest)
+			return ""
+		}
 	}
 
 	return r.FormValue(constants.Csrf_token)
