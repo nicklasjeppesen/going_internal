@@ -3,6 +3,7 @@ package request
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"reflect"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	form "github.com/go-playground/form"
 	auth "github.com/nicklasjeppesen/going_internal/super/auth"
 	. "github.com/nicklasjeppesen/going_internal/super/result"
 	. "github.com/nicklasjeppesen/going_internal/super/validation"
@@ -172,13 +174,12 @@ func CallUnknownFunc(fn interface{}, argStrings []string, w http.ResponseWriter,
 			regulator++
 
 		case paramType.Kind() == reflect.Struct || paramType.Kind() == reflect.Pointer:
-			err, value := handleStructValue(w, r, paramType)
-			if err {
+			if err, value := handleStructValue(w, r, paramType); err != nil {
 				return
-			} // return / stop  of an error occur.
-
-			in[i] = value
-			regulator++
+			} else { // return / stop  of an error occur.
+				in[i] = value
+				regulator++
+			}
 
 		default:
 
@@ -209,7 +210,7 @@ func CallUnknownFunc(fn interface{}, argStrings []string, w http.ResponseWriter,
 	handleReturnValues(returnValues, w, r)
 }
 
-func handleStructValue(w http.ResponseWriter, r *http.Request, paramType reflect.Type) (bool, reflect.Value) {
+func handleStructValue(w http.ResponseWriter, r *http.Request, paramType reflect.Type) (error, reflect.Value) {
 
 	switch {
 	case strings.HasPrefix(paramType.Name(), "RequestBodybase["):
@@ -217,19 +218,187 @@ func handleStructValue(w http.ResponseWriter, r *http.Request, paramType reflect
 	case strings.HasPrefix(paramType.Name(), "Requestbase"):
 		return handleRequest(w, r, paramType)
 	}
-	return true, reflect.Value{}
+	return errors.New("wrong input type"), reflect.Value{}
 }
 
-func handleRequest(w http.ResponseWriter, r *http.Request, paramType reflect.Type) (bool, reflect.Value) {
-
+func handleRequest(w http.ResponseWriter, r *http.Request, paramType reflect.Type) (error, reflect.Value) {
 	meta := reflect.New(paramType).Elem()
-
-	// Use FieldByIndex (faster, no string lookup)
 	meta.FieldByIndex([]int{0}).Set(reflect.ValueOf(w))
 	meta.FieldByIndex([]int{1}).Set(reflect.ValueOf(r))
-	return false, meta
+	return nil, meta
 }
 
+func handleRequestBody(w http.ResponseWriter, r *http.Request, requestBodyStruct reflect.Type) (error, reflect.Value) {
+	if err, requestBodyField := getRequestBodyFieldBody(w, r, requestBodyStruct); err != nil {
+		return err, reflect.Value{}
+	} else {
+		return nil, buildRequestBody(requestBodyStruct, w, r, requestBodyField)
+	}
+}
+
+func getRequestBodyFieldBody(w http.ResponseWriter, r *http.Request, requestBodyStruct reflect.Type) (error, reflect.Value) {
+	if err, requestBodyField := getRequestBodyField(requestBodyStruct, w); err != nil {
+		return err, reflect.Value{}
+	} else {
+		return requestBodyFieldWithData(requestBodyField, r)
+	}
+}
+
+func getRequestBodyField(requestBodyStruct reflect.Type, w http.ResponseWriter) (error, reflect.StructField) {
+	field, ok := requestBodyStruct.FieldByName("Body")
+	if !ok {
+		return errors.New("Struct must contain Body field"), reflect.StructField{}
+	}
+	return nil, field
+}
+
+func requestBodyFieldWithData(requestBodyField reflect.StructField, r *http.Request) (error, reflect.Value) {
+	if err, ormStruct := createOrmStruct(requestBodyField.Type); err != nil {
+		return err, reflect.Value{}
+	} else {
+		err = parseDataToOrm(r, ormStruct.Interface(), requestBodyField.Type)
+		return err, ormStruct
+	}
+}
+
+func createOrmStruct(ormStructReflect reflect.Type) (error, reflect.Value) {
+	ormStruct := reflect.New(ormStructReflect)
+	DBMethod := ormStruct.MethodByName("DB")
+
+	if DBMethod.IsValid() && DBMethod.Type().NumIn() == 0 {
+		ORMresult := DBMethod.Call(nil) // Calling ORM DB method, for preparing the orm struct
+
+		if len(ORMresult) > 0 {
+			ormStruct = ORMresult[0]
+		}
+	}
+	return nil, ormStruct
+}
+
+func parseDataToOrm(r *http.Request, target any, t reflect.Type) error {
+
+	contentType := r.Header.Get("Content-Type")
+	switch {
+
+	case strings.Contains(contentType, "application/json"):
+		return decodeJSONBody(r, target, t)
+
+	case strings.Contains(contentType, "application/x-www-form-urlencoded"):
+		return decodeFormBody(r, target)
+
+	case strings.Contains(contentType, "multipart/form-data"):
+		return decodeMultipartForm(r, target)
+
+	default:
+		return fmt.Errorf("unsupported content type")
+	}
+}
+
+func decodeJSONBody(r *http.Request, target any, reflectType reflect.Type) error {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return fmt.Errorf("failed reading body: %w", err)
+	}
+
+	if err := json.Unmarshal(body, target); err != nil {
+		return fmt.Errorf("invalid JSON body")
+	}
+
+	if err := validateRequiredJSONFields(body, reflectType); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func decodeFormBody(r *http.Request, target any) error {
+	decoder := form.NewDecoder()
+	err := decoder.Decode(target, r.Form)
+	return err
+	/*
+			if err := r.ParseForm(); err != nil {
+				return fmt.Errorf("invalid form body")
+			}
+
+			values := map[string]any{}
+
+			for key, value := range r.Form {
+				if len(value) > 0 {
+					values[key] = value[0]
+				}
+			}
+
+			data, err := json.Marshal(values)
+			if err != nil {
+				return err
+			}
+
+			if err := json.Unmarshal(data, target); err != nil {
+				return fmt.Errorf("failed mapping form fields")
+			}
+
+		return nil
+	*/
+}
+
+func decodeMultipartForm(r *http.Request, target any) error {
+
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		return fmt.Errorf("invalid multipart form")
+	}
+
+	values := map[string]any{}
+
+	for key, value := range r.MultipartForm.Value {
+		if len(value) > 0 {
+			values[key] = value[0]
+		}
+	}
+
+	data, err := json.Marshal(values)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(data, target); err != nil {
+		return fmt.Errorf("failed mapping multipart fields")
+	}
+
+	return nil
+}
+
+func validateRequiredJSONFields(body []byte, t reflect.Type) error {
+
+	var keyMap map[string]json.RawMessage
+	if err := json.Unmarshal(body, &keyMap); err != nil {
+		return fmt.Errorf("invalid JSON format")
+	}
+
+	for i := 0; i < t.NumField(); i++ {
+
+		tag := t.Field(i).Tag.Get("json")
+		tag = strings.Split(tag, ",")[0] // Foreslået af AI, skal lige tjekkes
+
+		if tag == "" || tag == "-" {
+			continue
+		}
+
+		if _, ok := keyMap[tag]; !ok {
+			return fmt.Errorf("missing key: %s", tag)
+		}
+	}
+
+	return nil
+}
+
+func buildRequestBody(paramType reflect.Type, w http.ResponseWriter, r *http.Request, body reflect.Value) reflect.Value {
+	requestBody := reflect.New(paramType).Elem()
+	requestBody.Field(0).Set(reflect.ValueOf(Requestbase{w, r}))
+	requestBody.Field(1).Set(body.Elem())
+	return requestBody
+}
+
+/*
 func handleRequestBody(w http.ResponseWriter, r *http.Request, paramType reflect.Type) (bool, reflect.Value) {
 
 	field, ok := paramType.FieldByName("Body")
@@ -297,7 +466,7 @@ func getRequestBody(r *http.Request) (error, []byte) {
 	defer r.Body.Close() // Always close the body
 
 	return nil, bodyBytes
-}
+}*/
 
 /*
 *
