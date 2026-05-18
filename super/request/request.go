@@ -155,13 +155,10 @@ func getParamTypes(fnValue reflect.Value) []reflect.Type {
  */
 func CallUnknownFunc(fn interface{}, argStrings []string, w http.ResponseWriter, r *http.Request) {
 	fnValue := reflect.ValueOf(fn) // get the value of the function
-	//fnKey := fnValue.Pointer()     // More stable than .String()
 	var paramTypes = getParamTypes(fnValue)
 
 	in := make([]reflect.Value, len(paramTypes))
 	regulator := 0
-
-	//rResponType := reflect.TypeOf((*http.Request)(nil))
 
 	for i, paramType := range paramTypes {
 
@@ -312,6 +309,8 @@ func decodeJSONBody(r *http.Request, target any, reflectType reflect.Type) error
 }
 
 func decodeFormBody(r *http.Request, target any) error {
+
+	fmt.Println("GOT HERE, if the eror is called")
 	decoder := form.NewDecoder()
 	err := decoder.Decode(target, r.Form)
 	return err
@@ -342,29 +341,36 @@ func decodeFormBody(r *http.Request, target any) error {
 }
 
 func decodeMultipartForm(r *http.Request, target any) error {
+	decoder := form.NewDecoder()
+	err := decoder.Decode(target, r.Form)
+	return err
 
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		return fmt.Errorf("invalid multipart form")
-	}
-
-	values := map[string]any{}
-
-	for key, value := range r.MultipartForm.Value {
-		if len(value) > 0 {
-			values[key] = value[0]
+	/*
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
+			return fmt.Errorf("invalid multipart form")
 		}
-	}
 
-	data, err := json.Marshal(values)
-	if err != nil {
-		return err
-	}
+		values := map[string]any{}
 
-	if err := json.Unmarshal(data, target); err != nil {
-		return fmt.Errorf("failed mapping multipart fields")
-	}
+		for key, value := range r.MultipartForm.Value {
+			if len(value) > 0 {
+				values[key] = value[0]
+			}
+		}
 
-	return nil
+		fmt.Println("Values from MultiPartForm", len(values))
+		data, err := json.Marshal(values)
+		if err != nil {
+			return err
+		}
+
+		if err := json.Unmarshal(data, target); err != nil {
+			return fmt.Errorf("failed mapping multipart fields")
+		}
+
+		fmt.Println("target value", target)
+		return nil
+	*/
 }
 
 func validateRequiredJSONFields(body []byte, t reflect.Type) error {
