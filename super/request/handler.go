@@ -1,0 +1,376 @@
+package request
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"reflect"
+	"strconv"
+	"strings"
+	"sync"
+)
+
+// Cache only the reflect.Type slices, NOT reflect.Value
+var typeCache sync.Map // thread safe map[string][]reflect.Type
+
+func getParamTypes(fnValue reflect.Value) []reflect.Type {
+
+	fnKey := fnValue.Pointer() // More stable than .String()
+
+	var paramTypes []reflect.Type
+	if cached, ok := typeCache.Load(fnKey); ok {
+		paramTypes = cached.([]reflect.Type)
+	} else {
+		// Extract parameter types of the function, and cache them.
+		fnType := fnValue.Type()
+		numIn := fnType.NumIn()
+		paramTypes = make([]reflect.Type, numIn)
+		for i := 0; i < numIn; i++ {
+			paramTypes[i] = fnType.In(i)
+		}
+		typeCache.Store(fnKey, paramTypes)
+	}
+	return paramTypes
+}
+
+/**
+ *
+ * Tanke: Lav en list som kan holde alle metodetyper: []interface{}
+ * Dvs. lav en metode som kan håndtere structs, int, string, bool, og parse them.
+ * alle metoder skal returnere val err, til err håndtering,
+ * Dermed hvis det er i cache, kan man loop igennem alle parameter index 1 gang, og smide dem ind i
+ * i den liste af function som passer til dem, så slipper man for foreach, case osv.
+ * dvs. en dic bestående key:string = functionsnavn, value: []interface{} - liste af functioner, til at håndtere,
+ * input parameter.
+ * Svært, da værdier parameter kommer fra: body, param.
+ * UDFØRELSE:
+ * først hentes de cachede type værdier det er en liste.
+ * OG SÅ SKAL DER LAVES EN SAMLET ARGLISTE I RÆKKEFØLGE: JsonData, FIBER.CTX, ...PARAMS
+ * SÅ loppes der igennem alle typer, og for param, sættes en index, og en handler
+ * således, at næste gang, der loppes igennem typer, så kalder paramtyper index i ARGLISTEN, får værdien og sætter ind I sin gemte handler.
+ */
+
+func CallUnknownFunc(fn interface{}, argStrings []string, w http.ResponseWriter, r *http.Request) {
+	fnValue := reflect.ValueOf(fn)
+	paramTypes := getParamTypes(fnValue)
+
+	args := make([]reflect.Value, 0, len(paramTypes))
+	argIndex := 0
+
+	for _, paramType := range paramTypes {
+
+		// Inject ResponseWriter
+		if paramType.Name() == "ResponseWriter" {
+			args = append(args, reflect.ValueOf(w))
+			continue
+		}
+
+		// Inject *http.Request
+		if paramType == reflect.TypeOf((*http.Request)(nil)) {
+			args = append(args, reflect.ValueOf(r))
+			continue
+		}
+
+		// Handle structs/pointers
+		if paramType.Kind() == reflect.Struct ||
+			paramType.Kind() == reflect.Pointer {
+
+			err, value := handleStructValue(w, r, paramType)
+			if err != nil {
+				return
+			}
+
+			args = append(args, value)
+			continue
+		}
+
+		// Normal URL/string arguments
+		if argIndex >= len(argStrings) {
+			http.Error(w, "missing parameter", http.StatusBadRequest)
+			return
+		}
+
+		value, err := parseArgument(argStrings[argIndex], paramType)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		args = append(args, value)
+		argIndex++
+	}
+
+	returnValues := fnValue.Call(args)
+	handleReturnValues(returnValues, w, r)
+}
+
+func parseArgument(arg string, t reflect.Type) (reflect.Value, error) {
+
+	switch t.Kind() {
+
+	case reflect.Int:
+		v, err := strconv.Atoi(arg)
+		if err != nil {
+			return reflect.Value{}, fmt.Errorf("invalid integer parameter")
+		}
+		return reflect.ValueOf(v), nil
+
+	case reflect.String:
+		return reflect.ValueOf(arg), nil
+
+	default:
+		return reflect.Value{}, fmt.Errorf(
+			"unsupported parameter type: %s",
+			t.String(),
+		)
+	}
+}
+
+func handleStructValue(w http.ResponseWriter, r *http.Request, paramType reflect.Type) (error, reflect.Value) {
+	switch {
+	case strings.HasPrefix(paramType.Name(), "RequestBodybase["):
+		return handleRequestBody(w, r, paramType)
+	case strings.HasPrefix(paramType.Name(), "Requestbase"):
+		return handleRequest(w, r, paramType)
+	}
+	return errors.New("wrong input type"), reflect.Value{}
+}
+
+func handleRequest(w http.ResponseWriter, r *http.Request, paramType reflect.Type) (error, reflect.Value) {
+	meta := reflect.New(paramType).Elem()
+	meta.FieldByIndex([]int{0}).Set(reflect.ValueOf(w))
+	meta.FieldByIndex([]int{1}).Set(reflect.ValueOf(r))
+	return nil, meta
+}
+
+func handleRequestBody(w http.ResponseWriter, r *http.Request, requestBodyStruct reflect.Type) (error, reflect.Value) {
+	if err, requestBodyField := getRequestBodyFieldBody(w, r, requestBodyStruct); err != nil {
+		return err, reflect.Value{}
+	} else {
+		return nil, buildRequestBody(requestBodyStruct, w, r, requestBodyField)
+	}
+}
+
+func getRequestBodyFieldBody(w http.ResponseWriter, r *http.Request, requestBodyStruct reflect.Type) (error, reflect.Value) {
+	if err, requestBodyField := getRequestBodyField(requestBodyStruct, w); err != nil {
+		return err, reflect.Value{}
+	} else {
+		return requestBodyFieldWithData(requestBodyField, r)
+	}
+}
+
+func getRequestBodyField(requestBodyStruct reflect.Type, w http.ResponseWriter) (error, reflect.StructField) {
+	field, ok := requestBodyStruct.FieldByName("Body")
+	if !ok {
+		return errors.New("Struct must contain Body field"), reflect.StructField{}
+	}
+	return nil, field
+}
+
+func requestBodyFieldWithData(requestBodyField reflect.StructField, r *http.Request) (error, reflect.Value) {
+	if err, ormStruct := createOrmStruct(requestBodyField.Type); err != nil {
+		return err, reflect.Value{}
+	} else {
+		err = parseDataToOrm(r, ormStruct.Interface(), requestBodyField.Type)
+		return err, ormStruct
+	}
+}
+
+func createOrmStruct(ormStructReflect reflect.Type) (error, reflect.Value) {
+
+	if ormStructReflect.Kind() == reflect.Ptr {
+		ormStructReflect = ormStructReflect.Elem()
+	}
+	ormStruct := reflect.New(ormStructReflect)
+	return nil, ormStruct
+
+	// Should not call the DB method, it should work for Going ORM  and normal DTO
+	/*
+		DBMethod := ormStruct.MethodByName("DB")
+
+		if DBMethod.IsValid() && DBMethod.Type().NumIn() == 0 {
+			ORMresult := DBMethod.Call(nil) // Calling ORM DB method, for preparing the orm struct
+			if len(ORMresult) > 0 {
+				ormStruct = ORMresult[0]
+			}
+		} else {
+			err = errors.New("ORM is nil")
+		}
+		return err, ormStruct
+	*/
+}
+
+func validateRequiredJSONFields(body []byte, t reflect.Type) error {
+	var keyMap map[string]json.RawMessage
+	if err := json.Unmarshal(body, &keyMap); err != nil {
+		return fmt.Errorf("invalid JSON format")
+	}
+
+	for i := 0; i < t.NumField(); i++ {
+
+		tag := t.Field(i).Tag.Get("json")
+		tag = strings.Split(tag, ",")[0] // Foreslået af AI, skal lige tjekkes
+
+		if tag == "" || tag == "-" {
+			continue
+		}
+
+		if _, ok := keyMap[tag]; !ok {
+			return fmt.Errorf("missing key: %s", tag)
+		}
+	}
+
+	return nil
+}
+
+func buildRequestBody(paramType reflect.Type, w http.ResponseWriter, r *http.Request, body reflect.Value) reflect.Value {
+	requestBody := reflect.New(paramType).Elem()
+	requestBody.Field(0).Set(reflect.ValueOf(Requestbase{w, r}))
+
+	if requestBody.Field(1).Type().Kind() == reflect.Ptr {
+		requestBody.Field(1).Set(body)
+	} else {
+		requestBody.Field(1).Set(body.Elem())
+	}
+	return requestBody
+}
+
+// Assume the return type is always a type of func(http.ResponseWriter, *http.Request)
+func handleReturnValues(returnvalues []reflect.Value, w http.ResponseWriter, r *http.Request) {
+
+	// Checking if return type is a correct reponse type.
+	if len(returnvalues) >= 1 {
+		if fn, ok := returnvalues[0].Interface().(func(http.ResponseWriter, *http.Request)); ok {
+			fn(w, r)
+		} // others?
+	}
+}
+
+// Depricated, since the new implementation is more efficient and cleaner, but keeping it for reference and backup.
+
+/*
+func handleRequestBody(w http.ResponseWriter, r *http.Request, paramType reflect.Type) (bool, reflect.Value) {
+
+	field, ok := paramType.FieldByName("Body")
+	if !ok {
+		panic("Struct parameter must have a 'Value' field")
+	}
+
+	strct := reflect.New(field.Type)
+	m, ok := strct.Type().MethodByName("DB")
+	if ok && m.IsExported() && strct.Elem().CanAddr() { // ptr. is a pointer from new method, so no need for
+
+		methodCaller := strct.Elem().Addr().MethodByName("DB")
+		if methodCaller.IsValid() && methodCaller.Type().NumIn() == 0 {
+			MethodArrayResult := methodCaller.Call(nil)
+			result := MethodArrayResult[0]
+			strct = result
+		}
+	}
+	err, jsonData := getRequestBody(r)
+	if err != nil {
+		http.Error(w, "Error reading body with error: "+err.Error(), http.StatusInternalServerError)
+		return true, reflect.Value{}
+	}
+
+	// STEP 1: Check Keys:
+	var keyMap map[string]json.RawMessage
+	if err := json.Unmarshal(jsonData, &keyMap); err != nil {
+		http.Error(w, "Invalid Json format", http.StatusBadRequest)
+
+		return true, reflect.Value{}
+	}
+	innerType := field.Type
+	for i := 0; i < innerType.NumField(); i++ {
+		tag := innerType.Field(i).Tag.Get("json")
+		if tag == "" || tag == "-" {
+			continue
+		}
+		if _, ok := keyMap[tag]; !ok {
+			http.Error(w, "Missing key: "+tag, http.StatusBadRequest)
+			return true, reflect.Value{}
+		}
+	}
+
+	// STEP 1.2: Unmarshall - add request data to struct:
+	if err := json.Unmarshal([]byte(jsonData), strct.Interface()); err != nil {
+		http.Error(w, "Invalid integer parameter", http.StatusBadRequest)
+		return true, reflect.Value{}
+	}
+
+	// Step 2: Build The requestBody struct
+	requestBody := reflect.New(paramType).Elem()
+
+	// Use FieldByIndex (faster, no string lookup)
+	requestBody.FieldByIndex([]int{0}).Set(reflect.ValueOf(Requestbase{w, r}))
+	requestBody.FieldByIndex([]int{1}).Set(strct.Elem()) // Know Value T index is 2
+	return false, requestBody
+}
+
+func getRequestBody(r *http.Request) (error, []byte) {
+
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		return err, nil
+	}
+	defer r.Body.Close() // Always close the body
+
+	return nil, bodyBytes
+}*/
+
+/*
+	func CallUnknownFunc(fn interface{}, argStrings []string, w http.ResponseWriter, r *http.Request) {
+		fnValue := reflect.ValueOf(fn) // get the value of the function
+		var paramTypes = getParamTypes(fnValue)
+
+		in := make([]reflect.Value, len(paramTypes))
+		regulator := 0
+
+		for i, paramType := range paramTypes {
+
+			switch {
+			case paramType.Name() == "ResponseWriter": // Since pointer to an interface, We have to check by name.
+				in[i] = reflect.ValueOf(w)
+				regulator++
+			case paramType == reflect.TypeOf((*http.Request)(nil)):
+				in[i] = reflect.ValueOf(r)
+				regulator++
+
+			case paramType.Kind() == reflect.Struct || paramType.Kind() == reflect.Pointer:
+				if err, value := handleStructValue(w, r, paramType); err != nil {
+					return
+				} else { // return / stop  of an error occur.
+					in[i] = value
+					regulator++
+				}
+
+			default:
+
+				if len(argStrings) == 0 {
+					break
+				}
+				argStr := argStrings[i-regulator] // what if nil?
+				switch paramType.Kind() {
+				case reflect.Int:
+					parsed, err := strconv.Atoi(argStr)
+					if err != nil {
+						http.Error(w, "Invalid integer parameter", http.StatusBadRequest)
+						return
+					}
+					in[i] = reflect.ValueOf(parsed)
+
+				case reflect.String:
+					in[i] = reflect.ValueOf(argStr)
+
+				default:
+					http.Error(w, "unsupported parameter type: "+paramType.String(), http.StatusBadRequest)
+					return
+				}
+			}
+		}
+
+		var returnValues = fnValue.Call(in)
+		handleReturnValues(returnValues, w, r)
+	}
+*/
