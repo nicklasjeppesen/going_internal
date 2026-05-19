@@ -15,9 +15,17 @@ func (c *SampleController) RenderHome() Result {
 		Params{"Title": "Min forside"})
 }
 */
+type viewparam = map[string]any
 
-func View(tmplView string, data map[string]interface{}) func(http.ResponseWriter, *http.Request) {
+func View(tmplView string, prop ...viewparam) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		var data map[string]any
+		if len(prop) > 0 && prop[0] != nil {
+			data = prop[0]
+		} else {
+			data = make(map[string]interface{})
+		}
 
 		// Parse templaten
 		tmpl, err := template.ParseFiles(
@@ -26,9 +34,6 @@ func View(tmplView string, data map[string]interface{}) func(http.ResponseWriter
 		if err != nil {
 			http.Error(w, "Template view was not found: "+err.Error(), http.StatusInternalServerError)
 			return
-		}
-		if data == nil {
-			data = make(map[string]interface{})
 		}
 
 		data[constants.Csrf_token] = r.Context().Value(constants.Csrf_token)
