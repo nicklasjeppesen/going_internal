@@ -26,7 +26,7 @@ type ActiveRecord[T IDB[T]] struct {
 }
 
 type ParentDB[T IDB[T]] struct {
-	Creator          DBCreator
+	creator          DBCreator
 	dbChild          *T // any type
 	with             []string
 	ignorevalidation bool
@@ -43,7 +43,7 @@ type DataResponse[T any] struct {
 type Responsehandler map[string]string
 
 func (parent *ParentDB[T]) GetDriver() IDrivers {
-	return parent.Creator.Driver
+	return parent.creator.Driver
 }
 
 func (parent *ActiveRecord[T]) ToJson() map[string]any {
@@ -163,7 +163,7 @@ func (parent *ParentDB[T]) DbConn() *sql.DB {
 	if parent.dbconn != nil {
 		return parent.dbconn
 	}
-	return parent.Creator.Driver.Open(parent.Creator.ConnectionString)
+	return parent.creator.Driver.Open(parent.creator.ConnectionString)
 }
 
 func (parent *ParentDB[T]) SetDbConn(conn *sql.DB) {
@@ -176,7 +176,7 @@ func (parent *ParentDB[T]) Ignorevalidation() T {
 }
 
 func (parent *ParentDB[T]) Or(column string, value any) T {
-	parent.Creator.Driver.Or_(column, value)
+	parent.creator.Driver.Or_(column, value)
 	return *parent.dbChild
 }
 
@@ -186,37 +186,37 @@ func (parent *ParentDB[T]) Or(column string, value any) T {
 * Ex. Where("id", ">", 2) -> where id > 2
  */
 func (parent *ParentDB[T]) Where(column string, value ...any) T {
-	parent.Creator.Driver.Where_(column, value)
+	parent.creator.Driver.Where_(column, value)
 	return *parent.dbChild
 }
 
 func (parent *ParentDB[T]) WhereMorph(column string, value ...any) T {
-	parent.Creator.Driver.Where_(column+"_type", value)
+	parent.creator.Driver.Where_(column+"_type", value)
 	return *parent.dbChild
 }
 
 func (parent *ParentDB[T]) WhereIn(column string, values []any) T {
-	parent.Creator.Driver.WhereIn_(column, values)
+	parent.creator.Driver.WhereIn_(column, values)
 	return *parent.dbChild
 }
 
 func (parent *ParentDB[T]) Limit(limit int) T {
-	parent.Creator.Driver.Limit_(limit)
+	parent.creator.Driver.Limit_(limit)
 	return *parent.dbChild
 }
 
 func (parent *ParentDB[T]) OffSet(limit int) T {
-	parent.Creator.Driver.OffSet_(limit)
+	parent.creator.Driver.OffSet_(limit)
 	return *parent.dbChild
 }
 
 func (parent *ParentDB[T]) OrderByDesc(column string) T {
-	parent.Creator.Driver.OrderByDesc_(column)
+	parent.creator.Driver.OrderByDesc_(column)
 	return *parent.dbChild
 }
 
 func (parent *ParentDB[T]) OrderBy(column string) T {
-	parent.Creator.Driver.OrderBy_(column)
+	parent.creator.Driver.OrderBy_(column)
 	return *parent.dbChild
 }
 
@@ -249,7 +249,7 @@ func (parent *ParentDB[T]) Save() (T, error) {
 
 	returningValues := object.ReturningValues()
 
-	var dbResult = parent.Creator.Driver.Save_(parent.DbConn(), keys, values, returningValues)
+	var dbResult = parent.creator.Driver.Save_(parent.DbConn(), keys, values, returningValues)
 
 	for i, value := range returningValues {
 		object.SetValue(value, dbResult[i])
@@ -293,7 +293,7 @@ func (parent *ParentDB[T]) First() T {
 	var syskeys = child.Systemcolumns()
 	var accKeys = append(keys, syskeys...)
 
-	var values = parent.Creator.Driver.First_(_db, accKeys)
+	var values = parent.creator.Driver.First_(_db, accKeys)
 	if values == nil {
 		return *parent.dbChild
 	}
@@ -367,7 +367,7 @@ func (parent *ParentDB[T]) Get() Collection[T] {
 	var syskeys = child.Systemcolumns()
 	var accKeys = append(keys, syskeys...)
 
-	var allvalues = parent.Creator.Driver.Get_(parent.DbConn(), accKeys)
+	var allvalues = parent.creator.Driver.Get_(parent.DbConn(), accKeys)
 	var mylist = []T{}
 	result := make([]ISystemFields, len(allvalues))
 
@@ -411,7 +411,7 @@ func (parent *ParentDB[T]) Update() error {
 	customColumns = append(customColumns, "updated_at")
 	values = append(values, time.Now())
 	var id = child.PrimaryKey()
-	parent.Creator.Driver.Where_("id", []any{id}).Update_(_db, customColumns, values)
+	parent.creator.Driver.Where_("id", []any{id}).Update_(_db, customColumns, values)
 
 	return nil
 
@@ -422,7 +422,7 @@ func (parent *ParentDB[T]) Delete() error {
 	child := *parent.dbChild
 	var primaryKey = child.PrimaryKey()
 	var _db = parent.DbConn()
-	var err = parent.Creator.Driver.Delete_(_db, primaryKey)
+	var err = parent.creator.Driver.Delete_(_db, primaryKey)
 
 	if err != nil {
 		log.Fatal(err.Error())
@@ -470,5 +470,5 @@ func createParent[T IDB[T]](model T, dbCreator DBCreator) *ParentDB[T] {
 		return newModel
 	})
 	model.SetDBConnection(dbCreator)
-	return &ParentDB[T]{Creator: dbCreator, dbChild: &model}
+	return &ParentDB[T]{creator: dbCreator, dbChild: &model}
 }
