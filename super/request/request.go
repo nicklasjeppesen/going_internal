@@ -259,17 +259,27 @@ func requestBodyFieldWithData(requestBodyField reflect.StructField, r *http.Requ
 }
 
 func createOrmStruct(ormStructReflect reflect.Type) (error, reflect.Value) {
-	ormStruct := reflect.New(ormStructReflect)
-	DBMethod := ormStruct.MethodByName("DB")
 
-	if DBMethod.IsValid() && DBMethod.Type().NumIn() == 0 {
-		ORMresult := DBMethod.Call(nil) // Calling ORM DB method, for preparing the orm struct
-
-		if len(ORMresult) > 0 {
-			ormStruct = ORMresult[0]
-		}
+	if ormStructReflect.Kind() == reflect.Ptr {
+		ormStructReflect = ormStructReflect.Elem()
 	}
+	ormStruct := reflect.New(ormStructReflect)
 	return nil, ormStruct
+
+	// Should not call the DB method, it should work for Going ORM  and normal DTO
+	/*
+		DBMethod := ormStruct.MethodByName("DB")
+
+		if DBMethod.IsValid() && DBMethod.Type().NumIn() == 0 {
+			ORMresult := DBMethod.Call(nil) // Calling ORM DB method, for preparing the orm struct
+			if len(ORMresult) > 0 {
+				ormStruct = ORMresult[0]
+			}
+		} else {
+			err = errors.New("ORM is nil")
+		}
+		return err, ormStruct
+	*/
 }
 
 func parseDataToOrm(r *http.Request, target any, t reflect.Type) error {
@@ -314,63 +324,12 @@ func decodeFormBody(r *http.Request, target any) error {
 	decoder := form.NewDecoder()
 	err := decoder.Decode(target, r.Form)
 	return err
-	/*
-			if err := r.ParseForm(); err != nil {
-				return fmt.Errorf("invalid form body")
-			}
-
-			values := map[string]any{}
-
-			for key, value := range r.Form {
-				if len(value) > 0 {
-					values[key] = value[0]
-				}
-			}
-
-			data, err := json.Marshal(values)
-			if err != nil {
-				return err
-			}
-
-			if err := json.Unmarshal(data, target); err != nil {
-				return fmt.Errorf("failed mapping form fields")
-			}
-
-		return nil
-	*/
 }
 
 func decodeMultipartForm(r *http.Request, target any) error {
 	decoder := form.NewDecoder()
 	err := decoder.Decode(target, r.Form)
 	return err
-
-	/*
-		if err := r.ParseMultipartForm(10 << 20); err != nil {
-			return fmt.Errorf("invalid multipart form")
-		}
-
-		values := map[string]any{}
-
-		for key, value := range r.MultipartForm.Value {
-			if len(value) > 0 {
-				values[key] = value[0]
-			}
-		}
-
-		fmt.Println("Values from MultiPartForm", len(values))
-		data, err := json.Marshal(values)
-		if err != nil {
-			return err
-		}
-
-		if err := json.Unmarshal(data, target); err != nil {
-			return fmt.Errorf("failed mapping multipart fields")
-		}
-
-		fmt.Println("target value", target)
-		return nil
-	*/
 }
 
 func validateRequiredJSONFields(body []byte, t reflect.Type) error {
@@ -400,8 +359,27 @@ func validateRequiredJSONFields(body []byte, t reflect.Type) error {
 func buildRequestBody(paramType reflect.Type, w http.ResponseWriter, r *http.Request, body reflect.Value) reflect.Value {
 	requestBody := reflect.New(paramType).Elem()
 	requestBody.Field(0).Set(reflect.ValueOf(Requestbase{w, r}))
-	requestBody.Field(1).Set(body.Elem())
+
+	if requestBody.Field(1).Type().Kind() == reflect.Ptr {
+		requestBody.Field(1).Set(body)
+	} else {
+		requestBody.Field(1).Set(body.Elem())
+	}
 	return requestBody
+}
+
+/*
+*
+* Assume the return type is always a type of func(http.ResponseWriter, *http.Request)
+ */
+func handleReturnValues(returnvalues []reflect.Value, w http.ResponseWriter, r *http.Request) {
+
+	// Checking if return type is a correct reponse type.
+	if len(returnvalues) >= 1 {
+		if fn, ok := returnvalues[0].Interface().(func(http.ResponseWriter, *http.Request)); ok {
+			fn(w, r)
+		}
+	}
 }
 
 /*
@@ -473,17 +451,3 @@ func getRequestBody(r *http.Request) (error, []byte) {
 
 	return nil, bodyBytes
 }*/
-
-/*
-*
-* Assume the return type is always a type of func(http.ResponseWriter, *http.Request)
- */
-func handleReturnValues(returnvalues []reflect.Value, w http.ResponseWriter, r *http.Request) {
-
-	// Checking if return type is a correct reponse type.
-	if len(returnvalues) >= 1 {
-		if fn, ok := returnvalues[0].Interface().(func(http.ResponseWriter, *http.Request)); ok {
-			fn(w, r)
-		}
-	}
-}
