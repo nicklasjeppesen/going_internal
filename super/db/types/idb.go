@@ -1,6 +1,7 @@
 package types
 
 import (
+	"context"
 	"database/sql"
 
 	. "github.com/nicklasjeppesen/going_internal/super/collections"
@@ -40,6 +41,7 @@ type IParent[T IRepository] interface {
 	GetWith() []string
 	OrderByDesc(column string) T
 	OrderBy(column string) T
+	GetCtx() context.Context
 }
 
 /*
@@ -47,7 +49,7 @@ type IParent[T IRepository] interface {
 * The Application models, required to have a DB function,
  */
 type IModels[T IRepository] interface {
-	DB() T // return it own type again, very usefull for coping the struct
+	DB(context.Context) T // return it own type again, very usefull for coping the struct
 }
 
 type IRepository interface {

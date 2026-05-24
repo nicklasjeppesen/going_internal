@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -33,6 +34,7 @@ type ParentDB[T IDB[T]] struct {
 	route            string
 	callback         Responsehandler
 	dbconn           *sql.DB
+	ctx              context.Context
 }
 
 type DataResponse[T any] struct {
@@ -362,7 +364,7 @@ func (parent *ParentDB[T]) CheckingRelationForMany(childs []ISystemFields, relat
 
 func (parent *ParentDB[T]) Get() Collection[T] {
 
-	child := (*parent.dbChild).DB()
+	child := (*parent.dbChild).DB(parent.ctx)
 	var keys = child.GetKeys()
 	var syskeys = child.Systemcolumns()
 	var accKeys = append(keys, syskeys...)
@@ -373,7 +375,7 @@ func (parent *ParentDB[T]) Get() Collection[T] {
 
 	for i, values := range allvalues {
 
-		var object = (*parent.dbChild).DB()
+		var object = (*parent.dbChild).DB(parent.ctx)
 		object.AddDBVal(keys, syskeys, values)
 		result[i] = object
 		mylist = append(mylist, object)
@@ -444,31 +446,35 @@ func (parent *ParentDB[T]) Pagination(r *http.Request, perPage int) map[string]a
 	return pagination.ToMap(results.ToJson())
 }
 
+func (parent *ParentDB[T]) GetCtx() context.Context {
+	return parent.ctx
+}
+
 /*
 * Setting up model to use default db connection defined in env
  */
-func CreateORM[T IDB[T]](model T) *ParentDB[T] {
-	return createParent(model, drivers.DefaultDBConnection())
+func CreateORM[T IDB[T]](model T, ctx context.Context) *ParentDB[T] {
+	return createParent(model, drivers.DefaultDBConnection(ctx), ctx)
 }
 
 /*
 *  Allow the model to connect to another and default database in runtime
  */
-func CreateORMWithCustomDB[T IDB[T]](model T, dbCreator DBCreator) *ParentDB[T] {
-	return createParent(model, dbCreator)
+func CreateORMWithCustomDB[T IDB[T]](model T, dbCreator DBCreator, ctx context.Context) *ParentDB[T] {
+	return createParent(model, dbCreator, ctx)
 }
 
 /*
 * Create the model
  */
-func createParent[T IDB[T]](model T, dbCreator DBCreator) *ParentDB[T] {
+func createParent[T IDB[T]](model T, dbCreator DBCreator, ctx context.Context) *ParentDB[T] {
 	dbCreator.Driver.SetTable(model.GetTable())
 	model.SetSelf(func() IRepository {
-		var newModel = model.DB()
+		var newModel = model.DB(ctx)
 		newModel.SetDBConnection(dbCreator)
 		newModel.With(model.GetWith()...)
 		return newModel
 	})
 	model.SetDBConnection(dbCreator)
-	return &ParentDB[T]{creator: dbCreator, dbChild: &model}
+	return &ParentDB[T]{creator: dbCreator, dbChild: &model, ctx: ctx}
 }

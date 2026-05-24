@@ -18,7 +18,7 @@ type HasManyMorphRelation[T IDB[T]] struct {
 // ex. company have comments,
 func (belong *HasManyMorphRelation[T]) Attach(data T) error {
 
-	data = data.DB()
+	data = data.DB(belong.Holder.GetCtx())
 
 	// Set relation type id
 	foreignId := belong.morph + "_id"

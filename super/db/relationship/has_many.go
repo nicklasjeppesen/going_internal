@@ -23,10 +23,10 @@ func (belong *HasManyRelation[T]) Attach(data IRepository) error {
 }
 
 func (belong *HasManyRelation[T]) Save(data IRepository) error {
-	data.SetValue(belong.foreignKey, belong.Holder.PrimaryKey())
+
+	data.SetValue(belong.foreignKey, belong.relationToEntiy.PrimaryKey())
 	_, err := data.SaveNonGenerics()
 	return err
-
 }
 
 // Set det local Key, determine by its name + "_id"
@@ -113,10 +113,12 @@ func (belong *HasManyRelation[T]) LoadMany(parents []ISystemFields, relationkey 
 }
 
 func NewHasMany[T IDB[T]](holder T, relationToEntiy IRepository) *HasManyRelation[T] {
-	return &HasManyRelation[T]{
+	hasMany := &HasManyRelation[T]{
 		Holder:          holder,
 		localKey:        "id",
 		relationToEntiy: relationToEntiy,
 		callerMeethod:   CallerMethodName(),
 	}
+	hasMany.setparent(relationToEntiy)
+	return hasMany
 }

@@ -1,6 +1,7 @@
 package drivers
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -25,22 +26,23 @@ type PostgresDB struct {
 	orderBy       []string // What column shall be
 	offSet        int
 	withOffSet    bool
+	ctx           context.Context
 }
 
-func CreatePostgressDB() types.DBCreator {
+func CreatePostgressDB(ctx context.Context) types.DBCreator {
 	var host = util.GetEnv(constants.DB_HOST, "")
 	var user = util.GetEnv(constants.DB_USER, "")
 	var password = util.GetEnv(constants.DB_PASS, "")
 	var dbname = util.GetEnv(constants.DB_DATABASE, "")
 	ConnectionString := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", host, user, password, dbname)
 	return types.DBCreator{
-		Driver:           &PostgresDB{},
+		Driver:           &PostgresDB{ctx: ctx},
 		ConnectionString: ConnectionString,
 	}
 }
 
 func (parent *PostgresDB) Clone() types.IDrivers {
-	return &PostgresDB{}
+	return &PostgresDB{ctx: parent.ctx}
 }
 
 func (parent *PostgresDB) Open(connectionString string) *sql.DB {
@@ -112,7 +114,7 @@ func (parent *PostgresDB) Save_(_db *sql.DB, columns []string, values []any, ret
 		scanArgs[i] = &result[i]
 	}
 
-	err := _db.QueryRow(query, values...).Scan(scanArgs...)
+	err := _db.QueryRowContext(parent.ctx, query, values...).Scan(scanArgs...)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -134,7 +136,7 @@ func (parent *PostgresDB) First_(_db *sql.DB, columns []string) []any {
 	var query = parent.querySelectMaker(columns)
 	query += " LIMIT 1"
 
-	row := _db.QueryRow(query, parent.Params...)
+	row := _db.QueryRowContext(parent.ctx, query, parent.Params...)
 	values := make([]any, len(columns))
 
 	for i := range values {
@@ -176,7 +178,7 @@ func (parent *PostgresDB) Update_(_db *sql.DB, columns []string, values []any) {
 	var accumaltedValues = append(parent.Params, values...)
 
 	query = parent.queryUpdateMaker(query)
-	err := _db.QueryRow(query, accumaltedValues...)
+	err := _db.QueryRowContext(parent.ctx, query, accumaltedValues...)
 	if err.Err() != nil {
 		log.Fatal(err.Err().Error())
 	}
@@ -190,7 +192,7 @@ func (parent *PostgresDB) Delete_(_db *sql.DB, id any) error {
 		parent.Where_("id", []any{id}) // Add the ID
 	}
 	var query = parent.queryDeleteMaker()
-	err := _db.QueryRow(query, parent.Params...)
+	err := _db.QueryRowContext(parent.ctx, query, parent.Params...)
 	if err.Err() != nil {
 		log.Fatal(err.Err().Error())
 		return err.Err()

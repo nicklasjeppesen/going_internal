@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	auth "github.com/nicklasjeppesen/going_internal/super/auth"
-	constants "github.com/nicklasjeppesen/going_internal/super/constants"
 	. "github.com/nicklasjeppesen/going_internal/super/result"
 	. "github.com/nicklasjeppesen/going_internal/super/validation"
 )
@@ -26,11 +25,7 @@ func (r *Requestbase) PrintJson(values ...any) {
 }
 
 func (r *Requestbase) Auth() auth.Auth {
-	userId := r.R.Context().Value(constants.Auth_id)
-	if userId != nil {
-		return auth.Auth{ID: userId.(string), W: r.W}
-	}
-	return auth.Auth{ID: "", W: r.W}
+	return auth.Auth{W: r.W, R: r.R}
 }
 
 // Validate a structs validation

@@ -87,14 +87,9 @@ func (m *Manager) serveWS(w http.ResponseWriter, r *http.Request, hub IBaseHub) 
 		return
 	}
 
-	// Create New Client
-	userId := r.Context().Value(constants.Auth_id)
-	var auth_ auth.Auth = auth.Auth{}
-	if userId != nil {
-		auth_ = auth.Auth{ID: userId.(string)}
-	}
-
+	auth_ := auth.Auth{R: r, W: w}
 	client := NewClient(conn, m, hub, auth_)
+
 	// Add the newly created client to the manager
 	m.addClient(client)
 

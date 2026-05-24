@@ -1,6 +1,7 @@
 package drivers
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -27,18 +28,19 @@ type SQLite struct {
 	orderBy       []string // What column shall be order
 	offSet        int
 	withOffSet    bool
+	ctx           context.Context
 }
 
-func CreateSQLite() types.DBCreator {
+func CreateSQLite(ctx context.Context) types.DBCreator {
 	var dbpath = util.GetEnv(constants.DB_PATH, "")
 	return types.DBCreator{
-		Driver:           &SQLite{},
+		Driver:           &SQLite{ctx: ctx},
 		ConnectionString: dbpath,
 	}
 }
 
 func (parent *SQLite) Clone() types.IDrivers {
-	return &SQLite{}
+	return &SQLite{ctx: parent.ctx}
 }
 
 func (parent *SQLite) Open(connectionString string) *sql.DB {
@@ -57,7 +59,7 @@ func (parent *SQLite) Get_(_db *sql.DB, columns []string) [][]any {
 	defer _db.Close()
 	var query = parent.querySelectMaker(columns)
 
-	rows, err := _db.Query(query, parent.Params...)
+	rows, err := _db.QueryContext(parent.ctx, query, parent.Params...)
 	if err != nil {
 		log.Fatal(err)
 		fmt.Println("Error getting rows")
@@ -109,7 +111,7 @@ func (parent *SQLite) Save_(_db *sql.DB, columns []string, values []any, returni
 
 	if len(returningValues) == 0 {
 		// Hvis ingen RETURNING, brug Exec i stedet for QueryRow
-		_, err := _db.Exec(query, values...)
+		_, err := _db.ExecContext(parent.ctx, query, values...)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -147,8 +149,7 @@ func (parent *SQLite) First_(_db *sql.DB, columns []string) []any {
 	var query = parent.querySelectMaker(columns)
 	query += " LIMIT 1"
 
-	row := _db.QueryRow(query, parent.Params...)
-
+	row := _db.QueryRowContext(parent.ctx, query, parent.Params...)
 	values := make([]any, len(columns))
 
 	for i := range values {
@@ -207,7 +208,7 @@ func (parent *SQLite) Delete_(_db *sql.DB, id any) error {
 	}
 	var query = parent.queryDeleteMaker()
 
-	_, err := _db.Exec(query, parent.Params...)
+	_, err := _db.ExecContext(parent.ctx, query, parent.Params...)
 	if err != nil {
 		log.Fatal(err.Error())
 		return err

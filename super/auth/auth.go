@@ -1,11 +1,10 @@
 package auth
 
 import (
-
-	//models "github.com/nicklasjeppesen/going_internal/app/models/db"
-
+	"context"
 	"net/http"
 
+	"github.com/nicklasjeppesen/going_internal/super/constants"
 	. "github.com/nicklasjeppesen/going_internal/super/db"
 	"github.com/nicklasjeppesen/going_internal/super/db/types"
 	. "github.com/nicklasjeppesen/going_internal/super/db/types"
@@ -19,7 +18,7 @@ type IUser struct {
 	SessionToken string
 }
 
-func (_user IUser) DB() *IUser {
+func (_user IUser) DB(ctx context.Context) *IUser {
 	user := &_user
 	user.Table = "users"
 	user.Columns = Columns{
@@ -27,25 +26,32 @@ func (_user IUser) DB() *IUser {
 		"email":    &user.Email,
 		"password": &user.Password,
 	}
-	user.ParentDB = CreateORM(user)
+	user.ParentDB = CreateORM(user, ctx)
 	return user
 }
 
 // Types
 type Auth struct {
-	ID string
-
 	EmailName    string
 	PasswordName string
 	TableName    string
 	W            http.ResponseWriter
+	R            *http.Request
 	Driver       types.DBCreator
+}
+
+func (auth *Auth) GetUserId() string {
+	userId := auth.R.Context().Value(constants.Auth_id)
+	return userId.(string)
 }
 
 func (auth *Auth) Attempt(criteria map[string]any) bool {
 
-	iUser := new(IUser).DB()
+	iUser := new(IUser).DB(auth.R.Context())
 	for column, value := range criteria {
+		if column == "password" {
+			continue
+		}
 		iUser.Where(column, value)
 	}
 
@@ -89,10 +95,10 @@ func (auth Auth) Login(username string, password string) error {
 
 func (auth Auth) Logout() {
 
-	user := new(IUser).DB().Where("id", auth.ID).First()
+	user := new(IUser).DB(auth.R.Context()).Where("id", auth.GetUserId()).First()
 	if user.Any() {
 		user.SessionToken = ""
-		user.DB().Update()
+		user.DB(auth.R.Context()).Update()
 	}
 	security.Logout(auth.W) // delete all sessions
 

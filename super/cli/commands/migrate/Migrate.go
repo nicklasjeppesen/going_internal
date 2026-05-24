@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -46,7 +47,7 @@ func run_migrations(_driver string) {
 		log.Fatalf("Error trying opening the database: %v", err)
 	}
 	defer db.Close()
-	driver := dbcreator.GetDBConnection(_driver)
+	driver := dbcreator.GetDBConnection(_driver, context.Background())
 
 	// Sikr at migrations tabellen findes
 	_, err = db.Exec(driver.Driver.CreateMigrationTable())

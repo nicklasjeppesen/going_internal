@@ -125,7 +125,7 @@ func (belong *BelongsToManyRelation[T]) getPivotMap(relationHolderIds []any) []m
 // execute SQL to get pivots values from pivot table
 func (belong *BelongsToManyRelation[T]) pivotsResults(ids []any) [][]any {
 
-	pivotDriver := belong.Holder.DB().GetDriver()
+	pivotDriver := belong.Holder.DB(belong.Holder.GetCtx()).GetDriver()
 	pivotDriver.SetTable(belong.pivotTable)
 
 	pivotsResults := pivotDriver.
@@ -219,7 +219,7 @@ func (belong *BelongsToManyRelation[T]) Attach(args ...any) error {
 //
 // Attach a relation to many
 func (belong *BelongsToManyRelation[T]) attach(input map[any]map[string]any) {
-	pivotDriver := belong.Holder.DB().GetDriver()
+	pivotDriver := belong.Holder.DB(belong.Holder.GetCtx()).GetDriver()
 	pivotDriver.SetTable(belong.pivotTable)
 
 	for foreignId, pivotMap := range input {
@@ -238,7 +238,7 @@ func (belong *BelongsToManyRelation[T]) attach(input map[any]map[string]any) {
 }
 
 func (belong *BelongsToManyRelation[T]) Detach(a ...any) error {
-	pivotDriver := belong.Holder.DB().GetDriver()
+	pivotDriver := belong.Holder.DB(belong.Holder.GetCtx()).GetDriver()
 	pivotDriver.SetTable(belong.pivotTable)
 
 	pivotDriver.Where_(belong.localKey, []any{belong.relation.PrimaryKey()})
@@ -263,7 +263,7 @@ func (belong *BelongsToManyRelation[T]) Detach(a ...any) error {
 func (belong *BelongsToManyRelation[T]) UpdateExistingPivot(input map[any]map[string]any) {
 
 	for foreignId, pivotMap := range input {
-		pivotDriver := belong.Holder.DB().GetDriver()
+		pivotDriver := belong.Holder.DB(belong.Holder.GetCtx()).GetDriver()
 		pivotDriver.SetTable(belong.pivotTable)
 
 		pivotDriver.
