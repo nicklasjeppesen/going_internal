@@ -25,6 +25,7 @@ type IDB[T IRepository] interface {
 	IParent[T]
 	IModels[T]
 	IRepository
+	GetCtx() context.Context
 }
 
 /*
@@ -41,7 +42,6 @@ type IParent[T IRepository] interface {
 	GetWith() []string
 	OrderByDesc(column string) T
 	OrderBy(column string) T
-	GetCtx() context.Context
 }
 
 /*

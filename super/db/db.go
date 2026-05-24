@@ -453,21 +453,21 @@ func (parent *ParentDB[T]) GetCtx() context.Context {
 /*
 * Setting up model to use default db connection defined in env
  */
-func CreateORM[T IDB[T]](model T, ctx context.Context) *ParentDB[T] {
-	return createParent(model, drivers.DefaultDBConnection(ctx), ctx)
+func CreateORM[T IDB[T]](ctx context.Context, model T) *ParentDB[T] {
+	return createParent(ctx, model, drivers.DefaultDBConnection(ctx))
 }
 
 /*
 *  Allow the model to connect to another and default database in runtime
  */
-func CreateORMWithCustomDB[T IDB[T]](model T, dbCreator DBCreator, ctx context.Context) *ParentDB[T] {
-	return createParent(model, dbCreator, ctx)
+func CreateORMWithCustomDB[T IDB[T]](ctx context.Context, model T, dbCreator DBCreator) *ParentDB[T] {
+	return createParent(ctx, model, dbCreator)
 }
 
 /*
 * Create the model
  */
-func createParent[T IDB[T]](model T, dbCreator DBCreator, ctx context.Context) *ParentDB[T] {
+func createParent[T IDB[T]](ctx context.Context, model T, dbCreator DBCreator) *ParentDB[T] {
 	dbCreator.Driver.SetTable(model.GetTable())
 	model.SetSelf(func() IRepository {
 		var newModel = model.DB(ctx)

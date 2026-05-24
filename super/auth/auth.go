@@ -26,7 +26,7 @@ func (_user IUser) DB(ctx context.Context) *IUser {
 		"email":    &user.Email,
 		"password": &user.Password,
 	}
-	user.ParentDB = CreateORM(user, ctx)
+	user.ParentDB = CreateORM(ctx, user)
 	return user
 }
 
