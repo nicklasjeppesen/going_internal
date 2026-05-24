@@ -16,8 +16,8 @@ var CertCmd = &cobra.Command{
 	GroupID: groups.GeneratorGroup.ID,
 	Args:    cobra.MinimumNArgs(1),
 	Use:     "make:cert [host]",
-	Short:   "Create new certificate for a host - ex. make:cert example.com or make:cert --host locahost",
-	Long:    `Create new certificate for a host - ex. make:cert example.com or make:cert --host locahost`,
+	Short:   "Create new certificate for a host - ex. make:cert example.com or make:cert locahost",
+	Long:    `Create new certificate for a host - ex. make:cert example.com or make:cert locahost`,
 	Run:     certCommand,
 }
 
