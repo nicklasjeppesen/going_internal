@@ -42,6 +42,9 @@ type Auth struct {
 
 func (auth *Auth) GetUserId() string {
 	userId := auth.R.Context().Value(constants.Auth_id)
+	if userId == nil {
+		return ""
+	}
 	return userId.(string)
 }
 
