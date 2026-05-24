@@ -26,5 +26,6 @@ func GetCommands() []*cobra.Command {
 		commands.HubCmd,
 		commands.MiddlewareCmd,
 		commands.JobsCmd,
+		commands.CertCmd,
 	}
 }

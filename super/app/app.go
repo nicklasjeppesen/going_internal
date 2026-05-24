@@ -33,6 +33,7 @@ func NewApp() *App {
 	app.Router = http.NewServeMux()
 	app.Scheduler = Scheduler.New()
 	app.LoadEnv()
+	app.UseTLS = true // Set to true to enable TLS, false for HTTP
 	return app
 }
 
