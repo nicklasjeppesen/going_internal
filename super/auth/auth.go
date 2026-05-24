@@ -32,12 +32,13 @@ func (_user IUser) DB(ctx context.Context) *IUser {
 
 // Types
 type Auth struct {
-	EmailName    string
-	PasswordName string
-	TableName    string
-	W            http.ResponseWriter
-	R            *http.Request
-	Driver       types.DBCreator
+	Email     string
+	Password  string
+	TableName string
+	Criteria  map[string]any
+	W         http.ResponseWriter
+	R         *http.Request
+	Driver    types.DBCreator
 }
 
 func (auth *Auth) GetUserId() string {
@@ -48,18 +49,17 @@ func (auth *Auth) GetUserId() string {
 	return userId.(string)
 }
 
-func (auth *Auth) Attempt(criteria map[string]any) bool {
-
+func (auth *Auth) Attempt() bool {
 	iUser := new(IUser).DB(auth.R.Context())
-	for column, value := range criteria {
-		if column == "password" {
-			continue
-		}
-		iUser.Where(column, value)
-	}
+	iUser.Where("email", auth.Email)
 
+	if auth.Criteria != nil {
+		for column, value := range auth.Criteria {
+			iUser.Where(column, value)
+		}
+	}
 	response := iUser.First()
-	if !response.Any() || !security.CheckPasswordhash(auth.getPasswordName(criteria), response.Password) {
+	if !response.Any() || !security.CheckPasswordhash(auth.Password, response.Password) {
 		return false
 	}
 
@@ -70,39 +70,11 @@ func (auth *Auth) Attempt(criteria map[string]any) bool {
 	return true
 }
 
-func (auth *Auth) getPasswordName(criteria map[string]any) string {
-	if auth.PasswordName == "" {
-		return criteria["password"].(string)
-	} else {
-		return criteria[auth.PasswordName].(string)
-	}
-
-}
-
-// https://www.youtube.com/watch?v=OmLdoEMcr_Y
-/*
-func (auth Auth) Login(username string, password string) error {
-
-	user := models.User{}.DB().Where("email", username).First()
-	if !user.Any() || !security.CheckPasswordhash(password, user.Password) {
-		return errors.New("email and password does not match")
-	}
-
-	// Store tokens in the database
-	token := security.LoginUser(user.Id, auth.W)
-	user.SessionToken = token
-	user.Update()
-
-	return nil
-}*/
-
 func (auth Auth) Logout() {
-
 	user := new(IUser).DB(auth.R.Context()).Where("id", auth.GetUserId()).First()
 	if user.Any() {
 		user.SessionToken = ""
 		user.DB(auth.R.Context()).Update()
 	}
 	security.Logout(auth.W) // delete all sessions
-
 }
