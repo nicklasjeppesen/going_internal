@@ -172,7 +172,8 @@ func requestBodyFieldWithData(requestBodyField reflect.StructField, r *http.Requ
 	if err, ormStruct := createOrmStruct(requestBodyField.Type); err != nil {
 		return err, reflect.Value{}
 	} else {
-		err = parseDataToOrm(r, ormStruct.Interface(), requestBodyField.Type)
+		err = parseDataToOrm(r, ormStruct.Interface())
+
 		return err, ormStruct
 	}
 }

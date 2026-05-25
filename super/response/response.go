@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/gorilla/sessions"
+	"github.com/nicklasjeppesen/going_internal/super/constants"
+	"github.com/nicklasjeppesen/going_internal/super/util"
 	. "github.com/nicklasjeppesen/going_internal/super/util"
 )
 
@@ -35,7 +38,6 @@ func (c *Response) PrintJson(_v any) func(http.ResponseWriter, *http.Request) {
 }
 
 func ToJSON(s any) (string, error) {
-
 	s = HasJsonFunc(s)
 	b, err := json.Marshal(s)
 	if err != nil {
@@ -56,14 +58,51 @@ func (c *Response) Redirect(Url string) func(http.ResponseWriter, *http.Request)
 	}
 }
 
-func (c *Response) Back(Url string) func(http.ResponseWriter, *http.Request) {
+func (c *Response) Back(errors ...map[string]any) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		referer := r.Referer()
 
+		session := getSession(r)
+		if len(errors) > 0 && errors[0] != nil {
+			session.Values[constants.Errors] = parseValueToSessions(errors[0])
+		}
+		session.Values[constants.Old] = parseValueToSessions(GetInputs(r))
+
+		// Save the session with the error messages
+		err := session.Save(r, w)
+		if err != nil {
+			fmt.Println("Error while saving session", err)
+		}
+
+		referer := r.Referer()
 		if referer == "" {
-			// fallback hvis browseren ikke sender Referer
 			referer = "/"
 		}
 		http.Redirect(w, r, referer, http.StatusSeeOther)
 	}
+}
+
+func getSession(r *http.Request) *sessions.Session {
+	var key = util.GetEnv(constants.APP_Key, "")
+	var store = sessions.NewCookieStore([]byte(key))
+	session, _ := store.Get(r, constants.Session_info)
+	session.Options.Path = "/"
+	return session
+}
+
+func parseValueToSessions(value any) string {
+
+	encodedValue, _ := json.Marshal(value)
+	return string(encodedValue)
+
+}
+
+func GetInputs(r *http.Request) map[string]any {
+	data := make(map[string]any)
+
+	for key, values := range r.Form {
+		for _, value := range values {
+			data[key] = value
+		}
+	}
+	return data
 }

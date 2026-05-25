@@ -13,3 +13,8 @@ const DB_HOST = "DB_HOST"
 const DB_USER = "DB_USER"
 const DB_PASS = "DB_PASS"
 const DB_DATABASE = "DB_DATABASE"
+
+// Sessions keys
+const Session_info = "session_info"
+const Errors = "errors"
+const Old = "old"
