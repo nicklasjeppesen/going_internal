@@ -20,6 +20,7 @@ func GetGroups() []*cobra.Group {
 func GetCommands() []*cobra.Command {
 	return []*cobra.Command{
 		commands.ControllerCmd,
+		commands.ControllerAPICmd,
 		commands.ModelCmd,
 		migrate.MigrateCmd,
 		migration.MigrationCmd,

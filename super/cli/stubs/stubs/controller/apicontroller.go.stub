@@ -1,0 +1,71 @@
+package controller
+
+type {{ .ControllerName }}Controller struct {
+	ControllerBase
+}
+
+// Index
+//
+// @Tags {{ .Resource }}
+// @Summary Display a listing of the resource
+// @Produce json
+// @Router /{{ .Route }} [get]
+func (c *{{ .ControllerName }}Controller) Index(r Request) Result {
+
+	return Response.PrintJson("index")
+
+}
+
+// Show
+//
+// @Tags {{ .Resource }}
+// @Summary Display the specified resource
+// @Produce json
+// @Param id path int true "{{ .Resource }} ID"
+// @Router /{{ .Route }}/{id} [get]
+func (c *{{ .ControllerName }}Controller) Show(id string, r Request) Result {
+
+	return Response.PrintJson("show")
+
+}
+
+// Store
+//
+// @Tags {{ .Resource }}
+// @Summary Store a newly created resource
+// @Accept json
+// @Produce json
+// @Router /{{ .Route }} [post]
+func (c *{{ .ControllerName }}Controller) Store(r Request) Result {
+
+	return Response.PrintJson("store")
+
+}
+
+// Update
+//
+// @Tags {{ .Resource }}
+// @Summary Update the specified resource
+// @Accept json
+// @Produce json
+// @Param id path int true "{{ .Resource }} ID"
+// @Param data body requests.Update{{ .ControllerName }}Request true "User payload"
+// @Router /{{ .Route }}/{id} [put]
+func (c *{{ .ControllerName }}Controller) Update(id string, r Request) Result {
+
+	return Response.PrintJson("update")
+
+}
+
+// Destroy
+//
+// @Tags {{ .Resource }}
+// @Summary Remove the specified resource
+// @Produce json
+// @Param id path int true "{{ .Resource }} ID"
+// @Router /{{ .Route }}/{id} [delete]
+func (c *{{ .ControllerName }}Controller) Destroy(id string, r Request) Result {
+
+	return Response.Print("destroy")
+
+}
