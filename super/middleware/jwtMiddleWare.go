@@ -15,9 +15,15 @@ func JWTMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(constants.Auth_token)
 
+		referer := r.Referer()
+		if referer == "" {
+			referer = "/"
+		}
+
 		// Check if cookie for login token exists
 		if err != nil || cookie.Value == "" {
-			http.Redirect(w, r, "/", http.StatusSeeOther)
+
+			http.Redirect(w, r, referer, http.StatusSeeOther)
 			return
 		}
 
@@ -27,7 +33,7 @@ func JWTMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 		if err != nil || !token.Valid {
 			http.Error(w, "Invalid token", http.StatusUnauthorized)
-			http.Redirect(w, r, "/", http.StatusMovedPermanently)
+			http.Redirect(w, r, referer, http.StatusMovedPermanently)
 			return
 		}
 
