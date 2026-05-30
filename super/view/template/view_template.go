@@ -20,7 +20,7 @@ func (c *SampleController) RenderHome() Result {
 }
 */
 
-var templates *template.Template
+var templates = map[string]*template.Template{}
 
 /*
 	func Init(CustomViewFunctions template.FuncMap) {
@@ -89,14 +89,22 @@ type TemplateView struct {
 }
 
 func (viewtemplate TemplateView) View(tmplView string, prop ...viewparam) func(http.ResponseWriter, *http.Request) {
-	if templates == nil {
-		templates = New().templates
+	if templates[viewtemplate.BaseView] == nil {
+		templates[viewtemplate.BaseView] = New().templates
+	}
+
+	baseView := viewtemplate.BaseView
+	if viewtemplate.BaseView == "" {
+		baseView = tmplView
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		data := getData(r, w, tmplView, prop...)
-		templates.ExecuteTemplate(w, viewtemplate.BaseView, data)
 
+		if err := templates[viewtemplate.BaseView].ExecuteTemplate(w, baseView, data); err != nil {
+			// TODO: Place with proper error handling
+			http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
+		}
 	}
 }
 
