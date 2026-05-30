@@ -12,10 +12,10 @@ import (
 	"time"
 
 	. "github.com/nicklasjeppesen/going_internal/super/collections"
+	"github.com/nicklasjeppesen/going_internal/super/customrouter/routeHelper"
 	drivers "github.com/nicklasjeppesen/going_internal/super/db/drivers"
 	. "github.com/nicklasjeppesen/going_internal/super/db/types"
 	global "github.com/nicklasjeppesen/going_internal/super/global"
-	"github.com/nicklasjeppesen/going_internal/super/route"
 	struct_to_map "github.com/nicklasjeppesen/going_internal/super/util"
 	validation "github.com/nicklasjeppesen/going_internal/super/validation"
 )
@@ -83,7 +83,7 @@ func (parent *ParentDB[T]) AddRoutes(prefix string, callback ...Responsehandler)
 func (parent *ParentDB[T]) addRoutes(data []T) []T {
 
 	var allRoutes = global.GetRouteNamedMap()
-	var urls = route.CollectValuesByPrefix(allRoutes, parent.route)
+	var urls = routeHelper.CollectValuesByPrefix(allRoutes, parent.route)
 
 	for _, _data := range data {
 		var keyValueURL = make(map[string]string) // map holdning values for for the input parameters.
@@ -98,7 +98,7 @@ func (parent *ParentDB[T]) addRoutes(data []T) []T {
 			}
 		}
 
-		var replaceURL, err = route.ReplaceURLPlaceholders(urls, keyValueURL)
+		var replaceURL, err = routeHelper.ReplaceURLPlaceholders(urls, keyValueURL)
 		if err != nil {
 			fmt.Println(err.Error())
 

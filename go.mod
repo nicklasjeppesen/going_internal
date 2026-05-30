@@ -3,19 +3,20 @@ module github.com/nicklasjeppesen/going_internal
 go 1.26.3
 
 require (
+	github.com/go-playground/form v3.1.4+incompatible
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/sessions v1.4.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/mattn/go-sqlite3 v1.14.44
+	github.com/spf13/cobra v1.10.2
 )
 
 require (
-	github.com/go-playground/form v3.1.4+incompatible // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/testify v1.10.0 // indirect
+	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 )
 
 require (
