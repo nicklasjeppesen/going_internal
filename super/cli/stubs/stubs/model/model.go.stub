@@ -1,6 +1,8 @@
 package db
 
 import (
+	"context"
+
 	. "github.com/nicklasjeppesen/going_internal/super/db"
 	. "github.com/nicklasjeppesen/going_internal/super/db/types"
 )
@@ -11,11 +13,11 @@ type {{.Model}} struct {
 }
 
 // Create a DB object for DB actions
-func (_{{.variableName}} {{.Model}}) DB() *{{.Model}} {
+func (_{{.variableName}} {{.Model}}) DB(ctx context.Context) *{{.Model}} {
 	{{.variableName}} := &_{{.variableName}}
 	{{.variableName}}.Table = "{{.tableName}}"
 	{{.variableName}}.Columns = {{.variableName}}.columns()
-	{{.variableName}}.ParentDB = CreateORM({{.variableName}})
+	{{.variableName}}.ParentDB = CreateORM(ctx, {{.variableName}})
 	return {{.variableName}}
 }
 
