@@ -39,7 +39,7 @@ func (e *Engine) loadTemplates() {
 				return err
 			}
 
-			if !d.IsDir() && strings.HasSuffix(path, ".template") {
+			if !d.IsDir() && (strings.HasSuffix(path, ".template") || strings.HasSuffix(path, ".tmpl") || strings.HasSuffix(path, ".html")) {
 				_, err = e.templates.ParseFiles(path)
 				if err != nil {
 					return err
