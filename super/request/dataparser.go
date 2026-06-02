@@ -36,7 +36,7 @@ func decodeJSONBody(r *http.Request, target any) error {
 	}
 
 	if err := json.Unmarshal(body, target); err != nil {
-		return fmt.Errorf("invalid JSON body")
+		return fmt.Errorf("invalid JSON body with error: %w", err)
 	}
 
 	/*
