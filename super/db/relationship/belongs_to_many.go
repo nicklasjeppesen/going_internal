@@ -51,12 +51,9 @@ func (belong *BelongsToManyRelation[T]) GetName() string {
 
 func (belong *BelongsToManyRelation[T]) Items() collections.Collection[T] {
 	if relation := belong.relation.GetRelationshipHolder(belong.callerMeethod); relation != nil {
-		results := collections.Collection[T]{}
-		for _, r := range relation {
-			collec := r.(T)
-			results = append(results, collec)
+		if collec, err := relation[0].(collections.Collection[T]); err == true {
+			return collec
 		}
-		return results
 	}
 	return nil
 }
