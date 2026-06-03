@@ -24,8 +24,8 @@ func (r *Requestbase) PrintJson(values ...any) {
 	}
 }
 
-func (r *Requestbase) Auth() auth.Auth {
-	return auth.Auth{W: r.W, R: r.R}
+func (r *Requestbase) Auth() *auth.Auth {
+	return &auth.Auth{W: r.W, R: r.R}
 }
 
 // Validate a structs validation

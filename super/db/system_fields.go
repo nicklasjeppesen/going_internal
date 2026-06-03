@@ -307,6 +307,8 @@ func f(ptr any) types.ValueHolder {
 				*p = val.(string)
 			case *int64:
 				*p = val.(int64)
+			case *int:
+				panic("use int64 instead of int for DB fields, to avoid overflow")
 			case *float64:
 				*p = val.(float64)
 			default:
