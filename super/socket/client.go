@@ -107,7 +107,7 @@ func NewClient(conn *websocket.Conn, manager *Manager, hub IBaseHub, auth auth.A
 		connectionID: uuid.New(),
 		connection:   conn,
 		manager:      manager,
-		egress:       make(chan Event),
+		egress:       make(chan Event, 1000),
 		hub:          hub,
 		Auth:         auth,
 	}
@@ -146,7 +146,7 @@ func (c *Client) readMessages() {
 				log.Printf("error reading message: %v", err)
 			}
 			// HANDLE CONNECTION CLOSE HERE
-			c.hub.CancleConnecetion(c)
+			c.hub.CancleConnection(c)
 			break // Break the loop to close conn & Cleanup
 		}
 		// Marshal incoming data into a Event struct

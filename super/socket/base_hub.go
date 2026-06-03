@@ -14,15 +14,8 @@ type IBaseHub interface {
 	Routing(Event, *Client) error
 	RegisterRoutes()
 	SetupDefaultHub()
-	CancleConnecetion(*Client)
+	CancleConnection(*Client)
 	AppReceiver(channels.Socket)
-}
-
-func NewHub[T IBaseHub](hub T) T {
-
-	hub.SetupDefaultHub()
-	hub.RegisterRoutes()
-	return hub
 }
 
 type BaseHub struct {
