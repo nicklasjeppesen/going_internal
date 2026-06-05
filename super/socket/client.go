@@ -6,12 +6,10 @@ import (
 	"log"
 	"time"
 
-	auth "github.com/nicklasjeppesen/going_internal/super/auth"
-
-	struct_to_map "github.com/nicklasjeppesen/going_internal/super/util"
-
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	auth "github.com/nicklasjeppesen/going_internal/super/auth"
+	struct_to_map "github.com/nicklasjeppesen/going_internal/super/util"
 )
 
 // ClientList is a map used to help manage a map of clients
@@ -74,7 +72,8 @@ func (client *Client) SendMessage(command string, contents ...any) error {
 	// Should properly be able to send without casting first
 	response := []any{}
 	for i := range contents {
-		response = append(response, struct_to_map.HasJsonFunc(contents[i]))
+		structValue := struct_to_map.HasJsonFunc(contents[i])
+		response = append(response, structValue)
 	}
 
 	b, err := json.Marshal(response)
@@ -84,7 +83,6 @@ func (client *Client) SendMessage(command string, contents ...any) error {
 	var newMessage = Event{Type: command, Payload: b}
 
 	client.egress <- newMessage
-
 	return nil
 }
 

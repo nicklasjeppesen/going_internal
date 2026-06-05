@@ -42,6 +42,7 @@ func (e *Engine) loadTemplates() {
 			if !d.IsDir() && (strings.HasSuffix(path, ".template") || strings.HasSuffix(path, ".tmpl") || strings.HasSuffix(path, ".html")) {
 				_, err = e.templates.ParseFiles(path)
 				if err != nil {
+					fmt.Errorf("Error occurred while parsing template '%s': %v", path, err)
 					return err
 				}
 			}

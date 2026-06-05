@@ -44,6 +44,8 @@ func HasJsonFunc(v any) any {
 			if methodName.IsValid() {
 				jsonReadyVal := methodName.Call(nil)[0].Interface()
 				list = append(list, jsonReadyVal)
+			} else {
+				list = append(list, current.Interface())
 			}
 		}
 		return list

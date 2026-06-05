@@ -19,7 +19,7 @@ type Room struct {
 func (room *Room) GetClientsId() []string {
 
 	clientsID := []string{}
-	for key := range room.Clients {
+	for key, _ := range room.Clients {
 		clientsID = append(clientsID, key)
 	}
 	return clientsID

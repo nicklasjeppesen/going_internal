@@ -50,7 +50,7 @@ func (belong *BelongsToManyRelation[T]) GetName() string {
 }
 
 func (belong *BelongsToManyRelation[T]) Items() collections.Collection[T] {
-	if relation := belong.relation.GetRelationshipHolder(belong.callerMeethod); relation != nil {
+	if relation := belong.relation.GetRelationshipHolder(belong.callerMeethod); len(relation) != 0 {
 		if collec, err := relation[0].(collections.Collection[T]); err == true {
 			return collec
 		}
