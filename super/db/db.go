@@ -381,8 +381,10 @@ func (parent *ParentDB[T]) Get() Collection[T] {
 		mylist = append(mylist, object)
 	}
 
-	for _, value := range parent.with {
-		parent.CheckingRelationForMany(result, value)
+	if len(result) != 0 && len(parent.with) != 0 {
+		for _, value := range parent.with {
+			parent.CheckingRelationForMany(result, value)
+		}
 	}
 
 	if parent.route != "" {

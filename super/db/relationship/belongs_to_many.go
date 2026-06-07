@@ -200,7 +200,7 @@ func (belong *BelongsToManyRelation[T]) Attach(args ...any) error {
 			belong.attach(map[any]map[string]any{v: nil})
 
 		case PivotData:
-			err = errors.New("Not allowed type, pissing foregeign id")
+			err = errors.New("Not allowed type, missing foregeign id")
 
 		case map[any]PivotData:
 			belong.Attach(v)
