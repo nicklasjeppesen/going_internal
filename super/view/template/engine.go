@@ -46,14 +46,14 @@ func (e *Engine) loadTemplates() {
 					return err
 				}
 			}
-
+			e.templates.Option("missingkey=error")
 			return nil
 		})
 }
 
 func (e *Engine) registerCoreFunctions() {
 
-	e.funcs["render"] = func(name string, data any) template.HTML {
+	e.funcs["render"] = func(name string, data any) (template.HTML, error) {
 		return e.RenderTemplate(name, data)
 	}
 
@@ -111,14 +111,14 @@ func (e *Engine) RenderComponent(name string, args ...any) (template.HTML, error
 	return template.HTML(buf.String()), nil
 }
 
-func (e *Engine) RenderTemplate(name string, data any) template.HTML {
+func (e *Engine) RenderTemplate(name string, data any) (template.HTML, error) {
 	var buf bytes.Buffer
 	err := e.templates.ExecuteTemplate(&buf, name, data)
 	if err != nil {
-		return ""
+		return "", err
 	}
 
-	return template.HTML(buf.String())
+	return template.HTML(buf.String()), nil
 }
 
 func (e *Engine) RenderOld(key string, data map[string]any) string {

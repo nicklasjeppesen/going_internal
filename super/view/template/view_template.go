@@ -1,6 +1,7 @@
 package template
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -22,65 +23,6 @@ func (c *SampleController) RenderHome() Result {
 
 var templates = map[string]*template.Template{}
 
-/*
-	func Init(CustomViewFunctions template.FuncMap) {
-		// Vi starter med at lave en tom template-samling
-		if templates != nil {
-			return
-		}
-
-		var funcMap = template.FuncMap{}
-		if CustomViewFunctions != nil {
-			funcMap = CustomViewFunctions
-		}
-
-		funcMap["old"] = func(key string, data map[string]any) any {
-			if val, exists := data[constants.Old]; exists {
-				if oldMap, ok := val.(map[string]string); ok {
-					if oldVal, found := oldMap[key]; found {
-						return oldVal
-					}
-				}
-			}
-			return "" // Return empty string if value does not exists
-		}
-
-		funcMap["render"] = func(name string, data any) template.HTML {
-			var buf bytes.Buffer
-
-			err := templates.ExecuteTemplate(&buf, name, data)
-			if err != nil {
-				return ""
-			}
-
-			return template.HTML(buf.String())
-		}
-
-		templates = template.New("")
-		templates.Funcs(funcMap)
-
-		// filepath.WalkDir gennemgår ALLE filer og undermapper i "view"
-		err := filepath.WalkDir("internal/resources/views", func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-
-			// Vi er kun interesserede i .html filer
-			if !d.IsDir() && strings.HasSuffix(path, ".template") {
-				// Indlæs filen og tilføj den til vores template-samling
-				_, err = templates.ParseFiles(path)
-				if err != nil {
-					return err
-				}
-			}
-			return nil
-		})
-
-		if err != nil {
-			panic("Fejl ved indlæsning af templates: " + err.Error())
-		}
-	}
-*/
 type viewparam = map[string]any
 
 type TemplateView struct {
@@ -101,10 +43,28 @@ func (viewtemplate TemplateView) View(tmplView string, prop ...viewparam) func(h
 	return func(w http.ResponseWriter, r *http.Request) {
 		data := getData(r, w, tmplView, prop...)
 
-		if err := templates[viewtemplate.BaseView].ExecuteTemplate(w, baseView, data); err != nil {
-			// TODO: Place with proper error handling
-			http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
+		// 1. Check if the template/block even exists in the general map
+		tmpl := templates[viewtemplate.BaseView]
+		if tmpl == nil || tmpl.Lookup(baseView) == nil {
+			http.Error(w, "Template error: Could not find view '"+baseView+"'. Check for spelling eror in {{ define }}?", http.StatusInternalServerError)
+			return
 		}
+
+		// 2. Check if the specific tmpView exists,
+		if tmpl.Lookup(tmplView) == nil {
+			http.Error(w, "Template error: Could not find view '"+tmplView+"'. Check for spelling eror in {{ define \""+tmplView+"\" }}", http.StatusInternalServerError)
+			return
+		}
+
+		var buf bytes.Buffer
+
+		if err := templates[viewtemplate.BaseView].ExecuteTemplate(&buf, baseView, data); err != nil {
+			// TODO: Place with proper error handling
+			fmt.Println("error", err.Error())
+			http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		buf.WriteTo(w)
 	}
 }
 
