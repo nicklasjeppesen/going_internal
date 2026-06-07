@@ -114,9 +114,6 @@ func (m *Manager) removeClient(client *Client) {
 
 	// Check if Client exists, then delete it
 	if _, ok := m.clients[client]; ok {
-		// close connection
-		client.connection.Close()
-		// remove
 		delete(m.clients, client)
 	}
 }

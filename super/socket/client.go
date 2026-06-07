@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,6 +37,29 @@ type Client struct {
 
 	// client properties
 	properties map[string]string
+
+	closeOnce sync.Once
+}
+
+var (
+	// pongWait is how long we will await a pong response from client
+	pongWait = 15 * time.Second
+	// pingInterval has to be less than pongWait, We cant multiply by 0.9 to get 90% of time
+	// Because that can make decimals, so instead *9 / 10 to get 90%
+	// The reason why it has to be less than PingRequency is becuase otherwise it will send a new Ping before getting response
+	pingInterval = (pongWait * 9) / 10
+)
+
+// NewClient is used to initialize a new Client with all required values initialized
+func NewClient(conn *websocket.Conn, manager *Manager, hub IBaseHub, auth auth.Auth) *Client {
+	return &Client{
+		connectionID: uuid.New(),
+		connection:   conn,
+		manager:      manager,
+		egress:       make(chan Event, 1000),
+		hub:          hub,
+		Auth:         auth,
+	}
 }
 
 func (client *Client) SetProperty(key string, value string) {
@@ -64,7 +88,14 @@ func (client *Client) GetManager() *Manager {
 }
 
 func (client *Client) SendEvent(event Event) {
-	client.egress <- event
+	select {
+	case client.egress <- event:
+		// Success
+	default:
+		// Channel is full
+		log.Printf("client %s egress channel full, dropping message", client.GetId())
+		client.closeConnection()
+	}
 }
 
 func (client *Client) SendMessage(command string, contents ...any) error {
@@ -82,46 +113,36 @@ func (client *Client) SendMessage(command string, contents ...any) error {
 	}
 	var newMessage = Event{Type: command, Payload: b}
 
-	client.egress <- newMessage
-	return nil
+	select {
+	case client.egress <- newMessage:
+		return nil
+	default:
+		return fmt.Errorf("client %s egress channel full", client.GetId())
+	}
 }
 
 func (client *Client) GetId() string {
 	return client.connectionID.String()
 }
 
-var (
-	// pongWait is how long we will await a pong response from client
-	pongWait = 10 * time.Second
-	// pingInterval has to be less than pongWait, We cant multiply by 0.9 to get 90% of time
-	// Because that can make decimals, so instead *9 / 10 to get 90%
-	// The reason why it has to be less than PingRequency is becuase otherwise it will send a new Ping before getting response
-	pingInterval = (pongWait * 9) / 10
-)
-
-// NewClient is used to initialize a new Client with all required values initialized
-func NewClient(conn *websocket.Conn, manager *Manager, hub IBaseHub, auth auth.Auth) *Client {
-	return &Client{
-		connectionID: uuid.New(),
-		connection:   conn,
-		manager:      manager,
-		egress:       make(chan Event, 1000),
-		hub:          hub,
-		Auth:         auth,
-	}
+func (c *Client) closeConnection() {
+	c.closeOnce.Do(func() {
+		c.hub.CancelConnection(c) // Custom method.
+		close(c.egress)
+		c.manager.removeClient(c)
+		c.hub.unregisterClient(c) // remove client from all rooms and, and messageHub client List
+		c.connection.Close()
+	})
 }
 
 // readMessages will start the client to read messages and handle them
 // appropriatly.
 // This is suppose to be ran as a goroutine
 func (c *Client) readMessages() {
-	defer func() {
-		// Graceful Close the Connection once this
-		// function is done
-		c.manager.removeClient(c)
-	}()
+	defer c.closeConnection()
+
 	// Set Max Size of Messages in Bytes
-	c.connection.SetReadLimit(512)
+	c.connection.SetReadLimit(512 * 1024)
 	// Configure Wait time for Pong response, use Current time + pongWait
 	// This has to be done here to set the first initial timer.
 	if err := c.connection.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
@@ -143,15 +164,14 @@ func (c *Client) readMessages() {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("error reading message: %v", err)
 			}
-			// HANDLE CONNECTION CLOSE HERE
-			c.hub.CancleConnection(c)
 			break // Break the loop to close conn & Cleanup
 		}
+
 		// Marshal incoming data into a Event struct
 		var request Event
 		if err := json.Unmarshal(payload, &request); err != nil {
-			log.Printf("error marshalling message: %v", err)
-			break // Breaking the connection here might be harsh xD
+			log.Printf("error unmarshalling message: %v", err)
+			continue
 		}
 
 		//------ CALL ROUTE HUB HERE! -------------//
@@ -162,7 +182,6 @@ func (c *Client) readMessages() {
 // pongHandler is used to handle PongMessages for the Client
 func (c *Client) pongHandler(pongMsg string) error {
 	// Current time + Pong Wait time
-	//log.Println("pong")
 	return c.connection.SetReadDeadline(time.Now().Add(pongWait))
 }
 
@@ -170,16 +189,12 @@ func (c *Client) pongHandler(pongMsg string) error {
 func (c *Client) writeMessages() {
 	// Create a ticker that triggers a ping at given interval
 	ticker := time.NewTicker(pingInterval)
-	defer func() {
-		ticker.Stop()
-		// Graceful close if this triggers a closing
-		c.manager.removeClient(c)
-	}()
+	defer ticker.Stop()
 
 	for {
 		select {
 		case message, ok := <-c.egress:
-			// Ok will be false Incase the egress channel is closed
+			// Ok will be false In case the egress channel is closed
 			if !ok {
 				// Manager has closed this connection channel, so communicate that to frontend
 				if err := c.connection.WriteMessage(websocket.CloseMessage, nil); err != nil {
@@ -193,19 +208,19 @@ func (c *Client) writeMessages() {
 			data, err := json.Marshal(message)
 			if err != nil {
 				log.Println(err)
-				return // closes the connection, should we really
+				continue // closes the connection, should we really
 			}
 			// Write a Regular text message to the connection
 			if err := c.connection.WriteMessage(websocket.TextMessage, data); err != nil {
 				log.Println(err)
+				return
 			}
 
 		case <-ticker.C:
-			//log.Println("ping")
 			// Send the Ping
 			if err := c.connection.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
 				log.Println("writemsg: ", err)
-				return // return to break this goroutine triggeing cleanup
+				return
 			}
 		}
 

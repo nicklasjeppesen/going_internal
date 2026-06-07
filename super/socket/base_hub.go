@@ -14,8 +14,9 @@ type IBaseHub interface {
 	Routing(Event, *Client) error
 	RegisterRoutes()
 	SetupDefaultHub()
-	CancleConnection(*Client)
+	CancelConnection(*Client)
 	AppReceiver(channels.Socket)
+	unregisterClient(client *Client)
 }
 
 type BaseHub struct {
@@ -44,6 +45,16 @@ func (hub *BaseHub) HasThisURL(urlCheck string) bool {
 */
 func (hub *BaseHub) CancleConnecetion(*Client) {
 
+}
+
+/*
+  - Function to handle when connection to client is closed
+  - Remove client from all rooms, and remove client from the hub client array
+    Who handle what should be done.
+*/
+func (hub *BaseHub) unregisterClient(client *Client) {
+	hub.Rooms.RemoveClientFromRooms(client)
+	delete(hub.Clients, client.Auth.GetUserId())
 }
 
 /*
