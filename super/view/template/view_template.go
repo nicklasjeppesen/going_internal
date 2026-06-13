@@ -118,7 +118,6 @@ func addViewData(propVal map[string]any, w http.ResponseWriter, r *http.Request,
 		session.Options.Path = "/" // Sikrer samme sti
 		session.Save(r, w)
 	} else {
-		fmt.Println("empty value")
 		propVal[name] = map[string]string{}
 		propVal["has"+name] = false
 
@@ -126,28 +125,3 @@ func addViewData(propVal map[string]any, w http.ResponseWriter, r *http.Request,
 	return propVal
 }
 
-/*
-func getTemplate(tmplView string, funcMap template.FuncMap) *template.Template {
-
-		var tmpl *template.Template
-
-		funcMap["render"] = func(name string, data any) template.HTML {
-			var buf bytes.Buffer
-
-			err := tmpl.ExecuteTemplate(&buf, name, data)
-			if err != nil {
-				return ""
-			}
-
-			return template.HTML(buf.String())
-		}
-
-		tmpl, _ = template.Must(
-			template.New("").
-				Funcs(funcMap).
-				ParseGlob(filepath.Join("internal/resources/views", "*.template")),
-		).ParseGlob(filepath.Join("internal/resources/views/auth", "*.template"))
-
-		return tmpl
-	}
-*/
