@@ -3,6 +3,7 @@ package hubs
 import (
 	"fmt"
 
+	"github.com/nicklasjeppesen/going_internal/super/channels"
 	socket "github.com/nicklasjeppesen/going_internal/super/socket"
 )
 
@@ -27,7 +28,7 @@ func ({{.Name}} *{{.Model}}) handleNewMessage(parameters []string, client *socke
 /*
 - handler when user is cancle a connection
 */
-func ({{.Name}} *{{.Model}}) CancleConnecetion(client *socket.Client) {
+func ({{.Name}} *{{.Model}}) CancelConnection(client *socket.Client) {
 	fmt.Println("User cancle the connection")
 }
 
