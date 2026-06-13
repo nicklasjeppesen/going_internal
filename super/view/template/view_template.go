@@ -117,6 +117,11 @@ func addViewData(propVal map[string]any, w http.ResponseWriter, r *http.Request,
 		delete(session.Values, name)
 		session.Options.Path = "/" // Sikrer samme sti
 		session.Save(r, w)
+	} else {
+		fmt.Println("empty value")
+		propVal[name] = map[string]string{}
+		propVal["has"+name] = false
+
 	}
 	return propVal
 }
