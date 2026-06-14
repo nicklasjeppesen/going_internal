@@ -77,9 +77,14 @@ func getData(r *http.Request, w http.ResponseWriter, tmplView string, prop ...vi
 
 	data = addErrors(data, w, r)
 	data = addOld(data, w, r)
+	data = addFlash(data, w, r)
 	data[constants.Csrf_token] = r.Context().Value(constants.Csrf_token)
 	data["ContentView"] = tmplView
 	return data
+}
+
+func addFlash(propVal map[string]any, w http.ResponseWriter, r *http.Request) map[string]any {
+	return addViewData(propVal, w, r, constants.Flash)
 }
 
 func addOld(propVal map[string]any, w http.ResponseWriter, r *http.Request) map[string]any {
@@ -110,6 +115,7 @@ func addViewData(propVal map[string]any, w http.ResponseWriter, r *http.Request,
 			fmt.Println(err.Error())
 		}
 
+		fmt.Println("has" + name)
 		propVal[name] = m2
 		propVal["has"+name] = true
 
@@ -124,4 +130,3 @@ func addViewData(propVal map[string]any, w http.ResponseWriter, r *http.Request,
 	}
 	return propVal
 }
-

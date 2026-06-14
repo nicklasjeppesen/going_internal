@@ -17,4 +17,5 @@ const DB_DATABASE = "DB_DATABASE"
 // Sessions keys
 const Session_info = "session_info"
 const Errors = "errors"
+const Flash = "flash"
 const Old = "old"
