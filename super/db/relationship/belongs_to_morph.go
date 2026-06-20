@@ -183,7 +183,13 @@ func (belong *BelongsToMorphRelation[T]) LoadMany(parents []ISystemFields, relat
 	// 2. Foreach type, Call it by a get. and get its input
 	for modelName, foreignKeys := range ForeignKeysMap {
 		// 3. Create the specicis type of them, så Get return [][] make it a user model eks.
+
+		// OBS: Check for null
 		modelTemplate := belong.relations(modelName)
+		if modelTemplate == nil {
+			continue
+		}
+
 		models := modelTemplate.WhereInNonGeneric(belong.localKey, foreignKeys).GetNonGeneric()
 
 		//4. Then find the parents with the matching type and id, get the relation by relationkey, and call its mapper function, to set the value
