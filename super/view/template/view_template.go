@@ -108,7 +108,7 @@ func addViewData(propVal map[string]any, w http.ResponseWriter, r *http.Request,
 
 	if messages, ok := session.Values[name].(string); ok {
 		var b2 = []byte(messages)
-		var m2 map[string]string
+		var m2 map[string]any
 
 		err = json.Unmarshal(b2, &m2)
 		if err != nil {
@@ -124,7 +124,7 @@ func addViewData(propVal map[string]any, w http.ResponseWriter, r *http.Request,
 		session.Options.Path = "/" // Sikrer samme sti
 		session.Save(r, w)
 	} else {
-		propVal[name] = map[string]string{}
+		propVal[name] = map[string]any{}
 		propVal["has"+name] = false
 
 	}

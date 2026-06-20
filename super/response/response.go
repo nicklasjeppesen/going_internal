@@ -22,24 +22,24 @@ import (
 
 // Struct to handle different kind of response, a controller can return.
 type Response struct {
-	errorMessage map[string]string
-	flashData    map[string]string
+	errorMessage map[string]any
+	flashData    map[string]any
 }
 
 func NewResponse() *Response {
 	response := new(Response)
-	response.errorMessage = map[string]string{}
-	response.flashData = map[string]string{}
+	response.errorMessage = map[string]any{}
+	response.flashData = map[string]any{}
 	return response
 
 }
 
-func (response *Response) WithErrors(errors map[string]string) *Response {
+func (response *Response) WithErrors(errors map[string]any) *Response {
 	response.errorMessage = errors
 	return response
 }
 
-func (response *Response) With(data map[string]string) *Response {
+func (response *Response) With(data map[string]any) *Response {
 	response.flashData = data
 	return response
 }

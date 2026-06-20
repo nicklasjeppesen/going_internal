@@ -121,9 +121,10 @@ func (e *Engine) RenderTemplate(name string, data any) (template.HTML, error) {
 	return template.HTML(buf.String()), nil
 }
 
-func (e *Engine) RenderOld(key string, data map[string]any) string {
+func (e *Engine) RenderOld(key string, data map[string]any) any {
 	if val, exists := data[constants.Old]; exists {
-		if oldMap, ok := val.(map[string]string); ok {
+		fmt.Println("Old exists")
+		if oldMap, ok := val.(map[string]any); ok {
 			if oldVal, found := oldMap[key]; found {
 				return oldVal
 			}
