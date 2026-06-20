@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -363,10 +364,6 @@ func (parent *SQLite) CreateMigrationTable() string {
 func (parent *SQLite) Migrate(scriptpath string) error {
 
 	// 1. Get DB
-	// 2. Verfify Migration tabel exists
-	// 3. Add migration file to the DB
-
-	util.LoadEnv() // Load the environment variable
 	var dbpath = util.GetEnv(constants.DB_PATH, "")
 	db, err := sql.Open("sqlite3", dbpath)
 	if err != nil {
@@ -375,14 +372,26 @@ func (parent *SQLite) Migrate(scriptpath string) error {
 
 	defer db.Close()
 
-	// Sikr at migrations tabellen findes
+	// 2. Make sure the migration table do exists in the DB
 	_, err = db.Exec(parent.CreateMigrationTable())
 	if err != nil {
 		log.Fatalf("Error connection to migration tabel: %v", err)
 	}
 
-	// Reading all files in ./scripts folder
-	files, err := os.ReadDir(scriptpath)
+	// 3. migrate the new files.
+	err = parent.LoadMigrationFile(scriptpath, db)
+	if err != nil {
+		return fmt.Errorf("migration failed: %w", err)
+	}
+
+	fmt.Println("All Migration executed successfully")
+	return nil
+
+}
+
+func (parent *SQLite) LoadMigrationFile(basePath string, db *sql.DB) error {
+
+	files, err := os.ReadDir(basePath)
 	if err != nil {
 		log.Fatalf("Could not read the folder: %v", err)
 	}
@@ -390,7 +399,7 @@ func (parent *SQLite) Migrate(scriptpath string) error {
 	// Filtering only *.SQL
 	var migrations []string
 	for _, f := range files {
-		if !f.IsDir() && filepathExt(f.Name()) == ".sql" {
+		if !f.IsDir() && strings.ToLower(filepath.Ext(f.Name())) == ".sql" {
 			migrations = append(migrations, f.Name())
 		}
 	}
@@ -414,32 +423,24 @@ func (parent *SQLite) Migrate(scriptpath string) error {
 
 		fmt.Printf("Running migration: %s\n", m)
 
-		sqlBytes, err := os.ReadFile(scriptpath + m)
+		fullPath := filepath.Join(basePath, m)
+		sqlBytes, err := os.ReadFile(fullPath)
 		if err != nil {
 			log.Fatalf("Could not read %s: %v", m, err)
 		}
 
-		_, err = db.Exec(string(sqlBytes))
+		_, err = db.ExecContext(parent.ctx, string(sqlBytes))
 		if err != nil {
-			fmt.Printf("Error by running %s: %v", m, err)
+			return fmt.Errorf("error executing SQL in %s: %w", m, err)
 		}
 
 		// inser into the migration tabel
 		_, err = db.Exec("INSERT INTO migrations (filename) VALUES ($1)", m)
 		if err != nil {
-			log.Fatalf("Error trying insert migration into migration tabel: %v", err)
+			return fmt.Errorf("error inserting %s into migrations table: %w", m, err)
 		}
-
 	}
 
-	fmt.Println("All Migration executed successfully")
 	return nil
 
-}
-
-func filepathExt(path string) string {
-	if len(path) < 4 {
-		return ""
-	}
-	return path[len(path)-4:]
 }

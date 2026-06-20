@@ -6,6 +6,7 @@ import (
 	groups "github.com/nicklasjeppesen/going_internal/super/cli/groups"
 	"github.com/nicklasjeppesen/going_internal/super/constants"
 	dbcreator "github.com/nicklasjeppesen/going_internal/super/db/drivers"
+	"github.com/nicklasjeppesen/going_internal/super/util"
 	"github.com/spf13/cobra"
 )
 
@@ -18,6 +19,7 @@ var MigrateCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		println("Running migrations")
+		util.LoadEnv() // Load the .env. before anything
 		dbCreator := dbcreator.DefaultDBConnection(context.Background())
 		dbCreator.Driver.Migrate(constants.DB_MIGRATION_DEFAULT_FILE_PATH)
 	},
