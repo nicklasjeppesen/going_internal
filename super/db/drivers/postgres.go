@@ -33,6 +33,13 @@ type PostgresDB struct {
 	connectionString string
 }
 
+func CreatePostgresDBCustom(ctx context.Context, ConnectionString string) types.DBCreator {
+	return types.DBCreator{
+		Driver:           &PostgresDB{ctx: ctx, connectionString: ConnectionString},
+		ConnectionString: ConnectionString,
+	}
+}
+
 func CreatePostgressDB(ctx context.Context) types.DBCreator {
 	var host = util.GetEnv(constants.DB_HOST, "")
 	var user = util.GetEnv(constants.DB_USER, "")

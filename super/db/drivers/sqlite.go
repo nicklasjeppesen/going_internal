@@ -42,6 +42,13 @@ func CreateSQLite(ctx context.Context) types.DBCreator {
 	}
 }
 
+func CreateSQLiteCustom(ctx context.Context, dbpath string) types.DBCreator {
+	return types.DBCreator{
+		Driver:           &SQLite{ctx: ctx},
+		ConnectionString: dbpath,
+	}
+}
+
 func (parent *SQLite) Clone() types.IDrivers {
 	return &SQLite{ctx: parent.ctx}
 }
