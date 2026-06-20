@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -16,17 +19,18 @@ import (
 // Postgress driver
 
 type PostgresDB struct {
-	Conditions    []string
-	Params        []any
-	IsWhere       bool
-	table         string
-	withLimit     bool
-	limit         int
-	shouldOrderBy bool     // Determine if the records shall be order by a column
-	orderBy       []string // What column shall be
-	offSet        int
-	withOffSet    bool
-	ctx           context.Context
+	Conditions       []string
+	Params           []any
+	IsWhere          bool
+	table            string
+	withLimit        bool
+	limit            int
+	shouldOrderBy    bool     // Determine if the records shall be order by a column
+	orderBy          []string // What column shall be
+	offSet           int
+	withOffSet       bool
+	ctx              context.Context
+	connectionString string
 }
 
 func CreatePostgressDB(ctx context.Context) types.DBCreator {
@@ -36,7 +40,7 @@ func CreatePostgressDB(ctx context.Context) types.DBCreator {
 	var dbname = util.GetEnv(constants.DB_DATABASE, "")
 	ConnectionString := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", host, user, password, dbname)
 	return types.DBCreator{
-		Driver:           &PostgresDB{ctx: ctx},
+		Driver:           &PostgresDB{ctx: ctx, connectionString: ConnectionString},
 		ConnectionString: ConnectionString,
 	}
 }
@@ -344,5 +348,81 @@ func (parent *PostgresDB) CreateMigrationTable() string {
 
 // TODO implement
 func (parent *PostgresDB) Migrate(scriptpath string) error {
+
+	db := parent.Open(parent.connectionString)
+	defer db.Close()
+
+	// Testing the connnection to the postgres DB
+	if err := db.Ping(); err != nil {
+		log.Fatalf("Error connecting to the database: %v", err)
+	}
+
+	// 2. Make sure the migration tabel exists
+	_, err := db.Exec(parent.CreateMigrationTable())
+	if err != nil {
+		log.Fatalf("Error connecting to migration table: %v", err)
+	}
+
+	// 3. Import the new files
+	err = parent.LoadMigrationFile(scriptpath, db)
+	if err != nil {
+		return fmt.Errorf("migration failed: %w", err)
+	}
+
+	fmt.Println("All Migrations executed successfully")
+	return nil
+}
+
+func (parent *PostgresDB) LoadMigrationFile(basePath string, db *sql.DB) error {
+	files, err := os.ReadDir(basePath)
+	if err != nil {
+		log.Fatalf("Could not read the folder: %v", err)
+	}
+
+	// Filtering kun *.sql
+	var migrations []string
+	for _, f := range files {
+		if !f.IsDir() && strings.ToLower(filepath.Ext(f.Name())) == ".sql" {
+			migrations = append(migrations, f.Name())
+		}
+	}
+
+	// Sorts i ASC order
+	sort.Strings(migrations)
+
+	// Run migration
+	for _, m := range migrations {
+		// Check if the file exists
+		var migrationAlreadyRun bool
+		err := db.QueryRow("SELECT EXISTS (SELECT 1 FROM migrations WHERE filename = $1)", m).Scan(&migrationAlreadyRun)
+		if err != nil {
+			log.Fatalf("Error checking migration table: %v", err)
+		}
+
+		if migrationAlreadyRun {
+			continue
+		}
+
+		fmt.Printf("Running migration: %s\n", m)
+
+		fullPath := filepath.Join(basePath, m)
+		sqlBytes, err := os.ReadFile(fullPath)
+		if err != nil {
+			log.Fatalf("Could not read %s: %v", m, err)
+		}
+
+		// Run SQL-script
+		_, err = db.ExecContext(parent.ctx, string(sqlBytes))
+		if err != nil {
+			return fmt.Errorf("error executing SQL in %s: %w", m, err)
+		}
+
+		// Insert into the migration table
+		_, err = db.Exec("INSERT INTO migrations (filename) VALUES ($1)", m)
+		if err != nil {
+			return fmt.Errorf("error inserting %s into migrations table: %w", m, err)
+		}
+	}
+
 	return nil
 }
