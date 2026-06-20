@@ -341,3 +341,8 @@ func (parent *PostgresDB) CreateMigrationTable() string {
 		);
 	`
 }
+
+// TODO implement
+func (parent *PostgresDB) Migrate(scriptpath string) error {
+	return nil
+}

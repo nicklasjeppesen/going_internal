@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -356,4 +358,88 @@ func (parent *SQLite) CreateMigrationTable() string {
 			applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 		);
 	`
+}
+
+func (parent *SQLite) Migrate(scriptpath string) error {
+
+	// 1. Get DB
+	// 2. Verfify Migration tabel exists
+	// 3. Add migration file to the DB
+
+	util.LoadEnv() // Load the environment variable
+	var dbpath = util.GetEnv(constants.DB_PATH, "")
+	db, err := sql.Open("sqlite3", dbpath)
+	if err != nil {
+		log.Fatalf("Error trying opening the database: %v", err)
+	}
+
+	defer db.Close()
+
+	// Sikr at migrations tabellen findes
+	_, err = db.Exec(parent.CreateMigrationTable())
+	if err != nil {
+		log.Fatalf("Error connection to migration tabel: %v", err)
+	}
+
+	// Reading all files in ./scripts folder
+	files, err := os.ReadDir(scriptpath)
+	if err != nil {
+		log.Fatalf("Could not read the folder: %v", err)
+	}
+
+	// Filtering only *.SQL
+	var migrations []string
+	for _, f := range files {
+		if !f.IsDir() && filepathExt(f.Name()) == ".sql" {
+			migrations = append(migrations, f.Name())
+		}
+	}
+
+	// Sorting in ASC order
+	sort.Strings(migrations)
+
+	// Running each migration
+	for _, m := range migrations {
+
+		// Check if the file already exists in the migration tabel
+		var migrationAlreadyRun bool
+		err := db.QueryRow("SELECT EXISTS (SELECT 1 FROM migrations WHERE filename = $1)", m).Scan(&migrationAlreadyRun)
+		if err != nil {
+			log.Fatalf("Error by checking migration tabel: %v", err)
+		}
+
+		if migrationAlreadyRun {
+			continue
+		}
+
+		fmt.Printf("Running migration: %s\n", m)
+
+		sqlBytes, err := os.ReadFile(scriptpath + m)
+		if err != nil {
+			log.Fatalf("Could not read %s: %v", m, err)
+		}
+
+		_, err = db.Exec(string(sqlBytes))
+		if err != nil {
+			fmt.Printf("Error by running %s: %v", m, err)
+		}
+
+		// inser into the migration tabel
+		_, err = db.Exec("INSERT INTO migrations (filename) VALUES ($1)", m)
+		if err != nil {
+			log.Fatalf("Error trying insert migration into migration tabel: %v", err)
+		}
+
+	}
+
+	fmt.Println("All Migration executed successfully")
+	return nil
+
+}
+
+func filepathExt(path string) string {
+	if len(path) < 4 {
+		return ""
+	}
+	return path[len(path)-4:]
 }

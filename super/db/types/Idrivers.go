@@ -31,4 +31,5 @@ type IDrivers interface {
 
 	// support functions
 	CreateMigrationTable() string
+	Migrate(scriptpath string) error
 }
