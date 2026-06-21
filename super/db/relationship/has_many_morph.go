@@ -46,20 +46,19 @@ func (belong *HasManyMorphRelation[T]) Save(data IRepository) error {
 // Set det local Key, determine by its name + "_id"
 // Ex. user table might hav the column company_id, which is the foreign key
 // Sets the local key for the relationship
-func (belong *HasManyMorphRelation[T]) ForeignKey(column string) IRelationship {
+func (belong *HasManyMorphRelation[T]) ForeignKey(column string) *HasManyMorphRelation[T] {
 	belong.foreignKey = column
 	return belong
 }
 
 // Asume a table follow the convension of id as primary key, if other key is used, then set it here
 
-func (belong *HasManyMorphRelation[T]) LocalKey(column string) IRelationship {
+func (belong *HasManyMorphRelation[T]) LocalKey(column string) *HasManyMorphRelation[T] {
 	belong.localKey = column
 	return belong
 }
 
 func (belong *HasManyMorphRelation[T]) setparent(relation ISystemFields) {
-
 	if belong.foreignKey != "" {
 		return
 	}
@@ -69,7 +68,6 @@ func (belong *HasManyMorphRelation[T]) setparent(relation ISystemFields) {
 
 func (belong *HasManyMorphRelation[T]) Load() {
 	belong.setparent(belong.relationToEntiy) // Setting Foreign key
-
 	foreignName := belong.morph + "_type"
 	foreIgnId := belong.morph + "_id"
 

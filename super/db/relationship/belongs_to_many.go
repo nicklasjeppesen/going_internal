@@ -20,17 +20,17 @@ type BelongsToManyRelation[T IDBConnection[T]] struct {
 	callerMeethod string
 }
 
-func (belong *BelongsToManyRelation[T]) ForeignKey(column string) IRelationship {
+func (belong *BelongsToManyRelation[T]) ForeignKey(column string) *BelongsToManyRelation[T] {
 	belong.foreignKey = column
 	return belong
 }
 
-func (belong *BelongsToManyRelation[T]) LocalKey(column string) IRelationship {
+func (belong *BelongsToManyRelation[T]) LocalKey(column string) *BelongsToManyRelation[T] {
 	belong.localKey = column
 	return belong
 }
 
-func (belong *BelongsToManyRelation[T]) Pivots(column ...string) IRelationship {
+func (belong *BelongsToManyRelation[T]) Pivots(column ...string) *BelongsToManyRelation[T] {
 	belong.pivotsColumns = column
 	return belong
 }

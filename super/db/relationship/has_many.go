@@ -32,14 +32,14 @@ func (belong *HasManyRelation[T]) Save(data IRepository) error {
 // Set det local Key, determine by its name + "_id"
 // Ex. user table might hav the column company_id, which is the foreign key
 // Sets the local key for the relationship
-func (belong *HasManyRelation[T]) ForeignKey(column string) IRelationship {
+func (belong *HasManyRelation[T]) ForeignKey(column string) *HasManyRelation[T] {
 	belong.foreignKey = column
 	return belong
 }
 
 // Asume a table follow the convension of id as primary key, if other key is used, then set it here
 
-func (belong *HasManyRelation[T]) LocalKey(column string) IRelationship {
+func (belong *HasManyRelation[T]) LocalKey(column string) *HasManyRelation[T] {
 	belong.localKey = column
 	return belong
 }

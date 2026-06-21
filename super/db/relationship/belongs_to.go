@@ -29,7 +29,7 @@ func (belong *BelongsTo[T]) Save(relation IRepository) error {
 // Set det local Key, determine by its name + "_id"
 // Ex. user table might hav the column company_id, which is the foreign key
 // Sets the local key for the relationship
-func (belong *BelongsTo[T]) ForeignKey(column string) IRelationship {
+func (belong *BelongsTo[T]) ForeignKey(column string) *BelongsTo[T] {
 	belong.foreignKey = column
 	return belong
 }
@@ -37,7 +37,7 @@ func (belong *BelongsTo[T]) ForeignKey(column string) IRelationship {
 /*
  * Asume a table follow the convension of id as primary key, if other key is used, then set it here
  */
-func (belong *BelongsTo[T]) LocalKey(column string) IRelationship {
+func (belong *BelongsTo[T]) LocalKey(column string) *BelongsTo[T] {
 	belong.localKey = column
 	return belong
 }
