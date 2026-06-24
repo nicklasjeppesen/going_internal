@@ -47,7 +47,7 @@ func New() *Scheduler {
 // CreateJob registers and immediately starts scheduling the given Job.
 // Returns a JobHandle and an error — the error is non-nil if the scheduler
 // has already been stopped.
-func (s *Scheduler) CreateJob(job Job) {
+func (s *Scheduler) CreateJob(job Job) error {
 
 	job.ctx = s.ctx
 	s.scheduler.Add(1)
@@ -107,6 +107,8 @@ func (s *Scheduler) CreateJob(job Job) {
 			}
 		}
 	}()
+
+	return nil
 }
 
 // Stop cancels the scheduler context and blocks until all ticker goroutines

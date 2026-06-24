@@ -34,6 +34,14 @@ type Job struct {
 	TerminateAfter time.Duration
 }
 
+func (job *Job) Ctx() context.Context {
+	return job.ctx
+}
+
+func NewJob(_ctx context.Context) *Job {
+	return &Job{ctx: _ctx}
+}
+
 // SendMessageToSocket
 //
 // Send a message to a websocket hub
