@@ -11,36 +11,27 @@ import (
 // 							Jobs
 //-----------------------------------------------------------------
 //
-// Jobs is responsible for provding a data structure,
-// for the Application scheduler
-//
-// Jobs is defined by defining af new Jobs struct
+// Job defines a unit of work to be executed periodically by the Scheduler.
+// Context is passed explicitly to the Runner rather than stored on the struct,
+// avoiding concurrent mutation and making the data flow clear.
 
 type Job struct {
 
-	//
-	// Go's context
-	ctx context.Context
-
-	//
 	// Title of the job
 	Title string
 
-	//
-	// The job that shall be executed in a time period
+	// Go's context
+	ctx context.Context
+
+	// Runner is the function executed on each tick.
 	Runner func(Job)
 
-	//
-	// How how shall the time be executed
+	// Interval controls how often the job is triggered.
 	Interval time.Duration
 
-	//
-	//  deadline The time can tim
+	// TerminateAfter sets a per-execution deadline. If zero, no deadline
+	// is applied beyond the scheduler's own context cancellation.
 	TerminateAfter time.Duration
-
-	//
-	// Reason for interrupted
-	InterruptedReason error
 }
 
 // SendMessageToSocket
@@ -51,20 +42,23 @@ func (job *Job) SendMessageToSocket(websocket channels.Socket) {
 	provider.SendMessageToSocket(websocket)
 }
 
-// Helper function to let the job know if it has been interrupted
-// interrupted can happen by a timeout fail or The server is shutting down
-func (job *Job) IsInterrupted() bool {
+// IsInterrupted reports whether the given context has been cancelled or
+// has exceeded its deadline. It also returns the reason, if any.
+func (job *Job) IsInterrupted() (bool, error) {
 	select {
 	case <-job.ctx.Done():
-		job.InterruptedReason = job.ctx.Err() // Set interrupted reason
-		return true
+		return true, job.ctx.Err()
 	default:
-		return false
+		return false, nil
 	}
 }
 
 func (job *Job) InterruptedByDeadlineExceeded() bool {
-	return job.InterruptedReason == context.DeadlineExceeded
+	_, err := job.IsInterrupted()
+	return err == context.DeadlineExceeded
 }
 
-func (job *Job) InterruptedByCanceled() bool { return job.InterruptedReason == context.Canceled }
+func (job *Job) InterruptedByCanceled() bool {
+	_, err := job.IsInterrupted()
+	return err == context.Canceled
+}
