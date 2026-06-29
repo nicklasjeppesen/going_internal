@@ -3,7 +3,6 @@ package db
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"log"
 	"maps"
@@ -17,7 +16,6 @@ import (
 	. "github.com/nicklasjeppesen/going_internal/super/db/types"
 	global "github.com/nicklasjeppesen/going_internal/super/global"
 	struct_to_map "github.com/nicklasjeppesen/going_internal/super/util"
-	validation "github.com/nicklasjeppesen/going_internal/super/validation"
 )
 
 // Maybe a good idea?
@@ -27,14 +25,13 @@ type ActiveRecord[T IDB[T]] struct {
 }
 
 type ParentDB[T IDB[T]] struct {
-	creator          DBCreator
-	dbChild          *T // any type
-	with             []string
-	ignorevalidation bool
-	route            string
-	callback         Responsehandler
-	dbconn           *sql.DB
-	ctx              context.Context
+	creator  DBCreator
+	dbChild  *T // any type
+	with     []string
+	route    string
+	callback Responsehandler
+	dbconn   *sql.DB
+	ctx      context.Context
 }
 
 type DataResponse[T any] struct {
@@ -172,11 +169,6 @@ func (parent *ParentDB[T]) SetDbConn(conn *sql.DB) {
 	parent.dbconn = conn
 }
 
-func (parent *ParentDB[T]) Ignorevalidation() T {
-	parent.ignorevalidation = true
-	return *parent.dbChild
-}
-
 func (parent *ParentDB[T]) Or(column string, value any) T {
 	parent.creator.Driver.Or_(column, value)
 	return *parent.dbChild
@@ -227,17 +219,6 @@ func (parent *ParentDB[T]) SaveNonGenerics() (IRepository, error) {
 }
 
 func (parent *ParentDB[T]) Save() (T, error) {
-
-	// Validate input
-
-	if !parent.ignorevalidation {
-		if err, errorMessage := validation.Validate(*parent.dbChild); err {
-			return *parent.dbChild, errors.New(errorMessage)
-		} else if err := validation.Customvalidation(parent.dbChild); err != nil {
-			return *parent.dbChild, err
-		}
-	}
-
 	var _db = parent.DbConn()
 	defer _db.Close()
 
@@ -397,13 +378,6 @@ func (parent *ParentDB[T]) Get() Collection[T] {
 func (parent *ParentDB[T]) Update() error {
 
 	child := *parent.dbChild
-	// Validate input
-	if !parent.ignorevalidation {
-		if err, errorMessage := validation.Validate(*parent.dbChild); err {
-			return errors.New(errorMessage)
-		}
-	}
-
 	var _db = parent.DbConn()
 	var customColumns = (*parent.dbChild).GetKeys() // custom columns
 	var values = []any{}                            // custom columns + updated_At

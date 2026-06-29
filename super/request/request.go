@@ -2,7 +2,6 @@ package request
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	auth "github.com/nicklasjeppesen/going_internal/super/auth"
@@ -32,7 +31,7 @@ func (r *Requestbase) Auth() *auth.Auth {
 // Return (bool, string)
 // bool: symbolize if an error happen.
 // string: error message.
-func (r *Requestbase) Validate(body interface{}) (bool, string) {
+func (r *Requestbase) Validate(body interface{}) (bool, map[string][]string) {
 	return Validate(body)
 }
 
@@ -40,8 +39,8 @@ func (r *Requestbase) FormValue(key string) string {
 	return r.R.FormValue(key)
 }
 
-func (r *Requestbase) GetInputs() map[string]interface{} {
-	data := make(map[string]interface{})
+func (r *Requestbase) GetInputs() map[string]string {
+	data := make(map[string]string)
 
 	for key, values := range r.R.Form {
 		for _, value := range values {
@@ -64,19 +63,15 @@ func (r *RequestBodybase[T]) GetBody() T {
 
 func (r *RequestBodybase[T]) Validate() *Result[T] {
 
-	if err, errorMessage := r.validate(); err {
-		return &Result[T]{Data: r.Body, Error: true, ErrorMessage: errors.New(errorMessage)}
+	if ok, errorMessage := Validate(r.Body); !ok {
+		return &Result[T]{Data: r.Body, HasError: true, Errors: errorMessage}
 	}
 
 	if err := Customvalidation(r.Body); err != nil {
-		return &Result[T]{Data: r.Body, Error: true, ErrorMessage: err}
+		return &Result[T]{Data: r.Body, HasError: true, Errors: map[string][]string{"error": {err.Error()}}}
 	}
 
-	return &Result[T]{Data: r.Body, Error: false, ErrorMessage: nil}
-}
-
-func (r *RequestBodybase[T]) validate() (bool, string) {
-	return Validate(r.Body)
+	return &Result[T]{Data: r.Body, HasError: false, Errors: map[string][]string{}}
 }
 
 /**

@@ -22,24 +22,54 @@ import (
 
 // Struct to handle different kind of response, a controller can return.
 type Response struct {
-	errorMessage map[string]any
-	flashData    map[string]any
+	errorMessage map[string][]string
+	flashData    map[string]string
 }
 
 func NewResponse() *Response {
 	response := new(Response)
-	response.errorMessage = map[string]any{}
-	response.flashData = map[string]any{}
-	return response
-
-}
-
-func (response *Response) WithErrors(errors map[string]any) *Response {
-	response.errorMessage = errors
+	response.errorMessage = map[string][]string{}
+	response.flashData = map[string]string{}
 	return response
 }
 
-func (response *Response) With(data map[string]any) *Response {
+// WithErrors adds validation errors to the response.
+//
+// Supported input types:
+//   - map[string]string
+//   - map[string][]string
+//   - string
+//
+// A map[string]string is automatically converted to the internal
+// map[string][]string representation, where each message becomes a
+// single-element slice.
+//
+// Any other type will cause a panic.
+func (response *Response) WithErrors(errors any) *Response {
+	switch e := errors.(type) {
+	case map[string]string:
+		parsedErrors := make(map[string][]string, len(e))
+
+		for field, message := range e {
+			parsedErrors[field] = []string{message}
+		}
+
+		response.errorMessage = parsedErrors
+
+	case map[string][]string:
+		response.errorMessage = e
+
+	case string:
+		response.errorMessage["error"] = []string{e}
+
+	default:
+		panic("WithErrors: unsupported error type")
+	}
+
+	return response
+}
+
+func (response *Response) With(data map[string]string) *Response {
 	response.flashData = data
 	return response
 }

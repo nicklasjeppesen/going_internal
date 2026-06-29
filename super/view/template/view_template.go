@@ -93,7 +93,38 @@ func addOld(propVal map[string]any, w http.ResponseWriter, r *http.Request) map[
 
 // add errors infomation to the view data, if there is any in the session
 func addErrors(propVal map[string]any, w http.ResponseWriter, r *http.Request) map[string]any {
-	return addViewData(propVal, w, r, constants.Errors)
+	var name = constants.Errors
+	var key = util.GetEnv(constants.APP_Key, "")
+	var store = sessions.NewCookieStore([]byte(key))
+
+	session, err := store.Get(r, constants.Session_info)
+	if err != nil {
+		fmt.Println("Fejl ved hentning af session:", err)
+	}
+
+	if messages, ok := session.Values[name].(string); ok {
+		var b2 = []byte(messages)
+		var m2 map[string][]string
+
+		err = json.Unmarshal(b2, &m2)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+
+		fmt.Println("has" + name)
+		propVal[name] = m2
+		propVal["has"+name] = true
+
+		// Delete the message, so it will not be shown again, after next reload (flash-message)
+		delete(session.Values, name)
+		session.Options.Path = "/" // Sikrer samme sti
+		session.Save(r, w)
+	} else {
+		propVal[name] = map[string][]string{}
+		propVal["has"+name] = false
+
+	}
+	return propVal
 }
 
 // add errors infomation to the view data, if there is any in the session

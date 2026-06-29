@@ -1,24 +1,26 @@
 package result
 
 type Result[T any] struct {
-	Error        bool
-	ErrorMessage error
-	Data         T
+	HasError bool
+	Errors   map[string][]string
+	Data     T
 }
 
-func (result *Result[T]) GetErrors() string {
-	if result.ErrorMessage == nil {
-		return ""
-	} else {
-		return result.ErrorMessage.Error()
+func (result *Result[T]) GetErrors() map[string][]string {
+	if result.HasError {
+		return result.Errors
 	}
+	return nil
 }
 
 func (c *Result[T]) And(handler func(*T) error) Result[T] {
-	if c.Error {
+	if c.HasError {
 		return *c
 	} else {
-		errors := handler(&c.Data)
-		return Result[T]{ErrorMessage: errors, Error: errors != nil, Data: c.Data}
+		if errors := handler(&c.Data); errors != nil {
+			c.Errors["errors"] = append(c.Errors["errors"], errors.Error())
+			c.HasError = true
+		}
+		return *c
 	}
 }

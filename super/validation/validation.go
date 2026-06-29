@@ -3,16 +3,19 @@ package validation
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/go-playground/validator/v10"
 )
 
-func Validate[T any](t T) (bool, string) {
+func Validate[T any](t T) (bool, map[string][]string) {
 	validate := validator.New()
 	err := validate.Struct(t)
 	if err != nil {
+
+		errorsMap := make(map[string][]string)
+
 		if validationErrors, ok := err.(validator.ValidationErrors); ok {
-			var errorMessages []string
 
 			valType := reflect.TypeOf(t)
 			// Hvis t er en pointer, tag elementet
@@ -21,30 +24,39 @@ func Validate[T any](t T) (bool, string) {
 			}
 
 			for _, fieldError := range validationErrors {
+				fieldName := fieldError.StructField()
 				// Use reflection to find the JSON field name
 				if field, found := valType.FieldByName(fieldError.StructField()); found {
 					jsonTag := field.Tag.Get("json")
 					// Split to remove any options like omitempty
-					jsonFieldName := jsonTag
+
+					/*jsonFieldName := jsonTag
 					if commaIndex := len(jsonTag); commaIndex != -1 {
 						jsonFieldName = jsonTag[:commaIndex]
+					}*/
+					if jsonTag != "" && jsonTag != "-" {
+						// Split for at fjerne options som f.eks. 'omitempty'
+						jsonFieldName := strings.Split(jsonTag, ",")[0]
+						if jsonFieldName != "" {
+							fieldName = jsonFieldName
+						}
 					}
 
 					errorMessage := fmt.Sprintf(
-						"Field '%s' failed validation '%s', expected: %v; ",
-						jsonFieldName,
+						"failed validation '%s', expected: %v; ",
 						fieldError.ActualTag(),
 						fieldError.Param(),
 					)
-					errorMessages = append(errorMessages, errorMessage)
+					errorsMap[fieldName] = append(errorsMap[fieldName], errorMessage)
 				}
 			}
-			return true, fmt.Sprintf("Validation errors: %s", errorMessages)
+			return false, errorsMap
 		}
 		// Handle unexpected errors from validator
-		return true, "Validation failed due to an unexpected error"
+		errorsMap["$global"] = append(errorsMap["$global"], "Validation failed due to an unexpected error")
+		return false, errorsMap
 	}
-	return false, ""
+	return true, map[string][]string{}
 
 }
 
