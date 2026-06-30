@@ -1,3 +1,7 @@
+// Package app orchestrates the core application life cycle. It handles
+// initialization, loading environment variables, setting up the HTTP server
+// with routing, optional TLS, static asset serving,
+// and managing a graceful shutdown process.
 package app
 
 import (
@@ -6,7 +10,6 @@ import (
 	"log"
 
 	Scheduler "github.com/nicklasjeppesen/going_internal/super/jobs"
-	"github.com/nicklasjeppesen/going_internal/super/view/inertiajs"
 
 	"net/http"
 	"os"
@@ -20,12 +23,21 @@ import (
 	_ "github.com/lib/pq" // PostgreSQL driver
 )
 
+// App aggregates the essential components of the application, including the
+// HTTP router, the background job scheduler, static assets, and configurations
+// for TLS and view engines.
 type App struct {
-	Router          *http.ServeMux
-	Scheduler       *Scheduler.Scheduler
-	EmbeddedFiles   embed.FS
-	UseTLS          bool // Set the flag during initialization
-	WithInertiaView bool
+	// Router is the primary multiplexer for handling incoming HTTP requests.
+	Router *http.ServeMux
+
+	// Scheduler manages background cron jobs and tasks.
+	Scheduler *Scheduler.Scheduler
+
+	// EmbeddedFiles holds static or template assets embedded into the binary.
+	EmbeddedFiles embed.FS
+
+	// UseTLS indicates whether the HTTP server should start with TLS (HTTPS) enabled.
+	UseTLS bool
 }
 
 func NewApp() *App {
@@ -37,6 +49,8 @@ func NewApp() *App {
 	return app
 }
 
+// NewApp creates, configures, and returns a pointer to a new App instance.
+// It initializes the router, background scheduler, and automatically loads the .env file.
 func (app App) Start() {
 
 	// 1. Setup services
@@ -48,11 +62,6 @@ func (app App) Start() {
 	// Serve static files from the "assets" directory
 	fs := http.FileServer(http.Dir("internal/resources/assets"))
 	app.Router.Handle("GET /assets/", http.StripPrefix("/assets/", fs))
-
-	// add Inertia view routes if enabled
-	if app.WithInertiaView {
-		app.inertiaView(app.Router, app.EmbeddedFiles)
-	}
 
 	// 2. Setup HTTP layer
 	server := &http.Server{
@@ -82,6 +91,8 @@ func (app App) Start() {
 	handleShutDown(server, app.Scheduler)
 }
 
+// handleShutDown stops the HTTP server and background scheduler gracefully,
+// allowing active requests up to 10 seconds to finish.
 func handleShutDown(server *http.Server, s *Scheduler.Scheduler) {
 	// Stop the webserver in a nice way
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -109,9 +120,4 @@ func GetURl() string {
 	var host = os.Getenv("APP_URL")
 	var url = host + getPort()
 	return url
-}
-
-func (app App) inertiaView(router *http.ServeMux, embeddedFiles embed.FS) {
-	inertiajs.ViewRoter(router, embeddedFiles)
-
 }
