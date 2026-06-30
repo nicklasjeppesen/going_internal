@@ -1,3 +1,5 @@
+// Package routeHelper provides utilities for parsing, manipulating, and
+// replacing placeholders within URL and routing paths.
 package routeHelper
 
 import (
@@ -6,12 +8,18 @@ import (
 	"strings"
 )
 
+// CountBracedParams counts the number of placeholders wrapped in curly braces (e.g., "{id}")
+// within the given path string.
 func CountBracedParams(path string) int {
 	re := regexp.MustCompile(`\{[^}]+\}`)
 	matches := re.FindAllString(path, -1)
 	return len(matches)
 }
 
+// ReplaceBracedParams replaces curly brace placeholders in a path with a slice of string values.
+// The values are replaced in the order they appear in the path.
+//
+// It returns an error if the number of placeholders does not match the number of values provided.
 func ReplaceBracedParams(path string, values []string) (string, error) {
 	re := regexp.MustCompile(`\{[^}]+\}`)
 	matches := re.FindAllString(path, -1)
@@ -28,6 +36,8 @@ func ReplaceBracedParams(path string, values []string) (string, error) {
 	return result, nil
 }
 
+// ConvertToStrings converts a slice of any types (interfaces) into a slice of strings
+// using fmt.Sprintf's default "%v" formatting.
 func ConvertToStrings(interfaces []any) []string {
 
 	strings := make([]string, len(interfaces))
@@ -38,21 +48,23 @@ func ConvertToStrings(interfaces []any) []string {
 	return strings
 }
 
-// ReplaceURLPlaceholders - replace placeholder in URL's with values from a map.
-// Returnerer fejl hvis en nøgle mangler.
+// ReplaceURLPlaceholders takes a map of named routes and replaces named placeholders (e.g., "{id}")
+// with their corresponding values from the provided values map.
 //
-//	example:
+// If a placeholder key is missing from the values map, the function skips that specific route
+// and returns an error.
 //
-//	urls := []string{
-//			"show: /user/{id}/",
-//			"showWorkspace: /user/{id}/workspace/{workspace_id}",
-//			"showBank: /user/{id}/bank/{bank_id}",
-//		}
-//		values := map[string]string{
-//			"id":           "1",
-//			"workspace_id": "44",
-//			 "bank_id": "5",
-//		}
+// Example:
+//
+//	urls := map[string]string{
+//		"show":          "/user/{id}/",
+//		"showWorkspace": "/user/{id}/workspace/{workspace_id}",
+//	}
+//	values := map[string]string{
+//		"id":           "1",
+//		"workspace_id": "44",
+//	}
+//	result, err := ReplaceURLPlaceholders(urls, values)
 func ReplaceURLPlaceholders(urls map[string]string, values map[string]string) (map[string]string, error) {
 
 	re := regexp.MustCompile(`\{([^}]+)\}`) // matcher {key}
@@ -83,8 +95,8 @@ func ReplaceURLPlaceholders(urls map[string]string, values map[string]string) (m
 	return newResult, err
 }
 
-// CollectValuesByPrefix
-// return a map where all routes name is equal to a given prefix
+// CollectValuesByPrefix filters a map of routes and returns a new map containing
+// only the entries where the route name starts with the specified prefix.
 func CollectValuesByPrefix(AllRouteNamesAndUrls map[string]string, prefix string) map[string]string {
 	var routeNamesAndUrls = make(map[string]string)
 	for routeName, url := range AllRouteNamesAndUrls {

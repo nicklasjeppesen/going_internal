@@ -1,3 +1,6 @@
+// Package customrouter implements a custom HTTP router that wraps around net/http.ServeMux.
+// It supports route grouping, automatic extraction of path parameters, named routes,
+// and middleware chaining at both route and router levels.
 package customrouter
 
 import (
@@ -12,40 +15,46 @@ import (
 	"github.com/nicklasjeppesen/going_internal/super/request"
 )
 
+// Modifier defines a function signature that processes an HTTP response and request.
 type Modifier func(w http.ResponseWriter, r *http.Request)
 
-// Constructor function to initialize MyRouter
+// NewMyRouter creates and initializes a new instance of MyRouter.
 func NewMyRouter() *MyRouter {
 
 	return &MyRouter{}
 }
 
+// MyRouter manages a collection of routes, global middlewares, and an optional URL prefix.
 type MyRouter struct {
-	// Basis a list of routes
+	// Handlers is a list of registered routes.
 	Handlers []Route
 
-	// Middlewares for alle route in the handler group
+	// middlewares holds the global middlewares applied to all routes in this router.
 	middlewares []middlewarestdlib.Middleware
 
-	// Prefix in front of every URL
-	// Ex.route.GET("/login", ..)
-	// prefix = api
-	// URL becomes api/user
+	// prefix is prepended to every URL path registered in this router
+	// Example:
+	// 	.route.GET("/user", ..)
+	// 	prefix = api
+	// 	URL becomes api/user
 	prefix string
 }
 
-// Route: Is responsible for holding a given route
-// Index: position in the webrouter list
-// path: Current URL path
-// HTTPType: define if it a GET, POST, PUT, DELETE, PATCH or OPTIONS
-// handler: specific handler/controller for the URL
-// Middleware: list of middlewares that have to return true, to reach the URL
+// Route represents a registered HTTP endpoint with its layout, method, handler,
 type Route struct {
-	index      int
-	path       string
-	httpType   string
-	name       string
-	handler    func(w http.ResponseWriter, r *http.Request)
+	// Index: position in the webrouter list
+	index int
+	// path: Current URL path
+	path string
+	// HTTPType: define if it a GET, POST, PUT, DELETE, PATCH or OPTIONS
+	httpType string
+
+	// name of the URL
+	name string
+	// handler: specific handler/controller for the URL
+	handler func(w http.ResponseWriter, r *http.Request)
+
+	// Middleware: list of middlewares that have to return true, to reach the URL
 	middleware []middlewarestdlib.Middleware
 }
 
@@ -78,6 +87,7 @@ func (router *MyRouter) OPTIONS(path string, handler interface{}) *Route {
 	return router.httpHandler("OPTIONS", path, handler)
 }
 
+// httpHandler is an internal helper that constructs a Route and appends it to the router's Handlers.
 func (router *MyRouter) httpHandler(HTTPType string, path string, handler interface{}) *Route {
 
 	newRoute := Route{
@@ -92,6 +102,7 @@ func (router *MyRouter) httpHandler(HTTPType string, path string, handler interf
 
 }
 
+// Take an controller function (handler) and wrap it in a net/http.ServeMux request
 func routeHandler(handler interface{}) Modifier {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var urlParamKeys = extractPathParams(r.Pattern)
@@ -103,7 +114,7 @@ func routeHandler(handler interface{}) Modifier {
 	}
 }
 
-// ExtractPathParams extracts parameter keys from a path like "/hejverden/{id}/{world}"
+// ExtractPathParams extracts parameter keys from a path like "/helloworld/{id}/{world}"
 func extractPathParams(pathTemplate string) []string {
 	re := regexp.MustCompile(`\{([^\}]+)\}`)
 	matches := re.FindAllStringSubmatch(pathTemplate, -1)
@@ -117,15 +128,15 @@ func extractPathParams(pathTemplate string) []string {
 	return params
 }
 
-// Set the name of a routing URL
+// Name assigns a unique lookup name to the Route.
+// It can be use the generate URL for a db model
 func (router *Route) Name(name string) *Route {
 	router.name = name
 	return router
 }
 
-// AddMiddleware
-//
-// Add a middleware to a route, that will be process before reaching the handler
+// AddMiddleware adds one or more route-specific middlewares to the Route.
+// These are processed sequentially before reaching the route's final handler.
 func (router *Route) AddMiddleware(middlewares ...func(http.HandlerFunc) http.HandlerFunc) *Route {
 	for _, middleware := range middlewares {
 		router.middleware = append(router.middleware, middleware)
@@ -133,12 +144,12 @@ func (router *Route) AddMiddleware(middlewares ...func(http.HandlerFunc) http.Ha
 	return router
 }
 
-// GetURL:
+// GetURL looks up a dynamic route by its assigned name and replaces its curly-brace
 //
 // - parameters:
 //
 //   - name: name of the route, user want.
-//     parameters: route path parameter, that shall be exchanges with  the parameter in the URL.
+//   - parameters: route path parameter, that shall be exchanges curly brackes in the url.
 //
 // - return:
 //   - (url, error) return (url, ""), if no errors, else empty string and error message.
@@ -151,7 +162,7 @@ func (myrouter *MyRouter) GetURL(name string, parameters ...any) string {
 
 	var parameterAsStrings []string = routeHelper.ConvertToStrings(parameters)
 	var paraLenght int = len(parameterAsStrings)
-	var routelenght int = routeHelper.CountBracedParams(routeURL)
+	routelenght := routeHelper.CountBracedParams(routeURL)
 
 	if paraLenght != routelenght {
 		fmt.Println("Not equal lenght")
@@ -159,23 +170,21 @@ func (myrouter *MyRouter) GetURL(name string, parameters ...any) string {
 	}
 
 	if replacedRoute, err := routeHelper.ReplaceBracedParams(routeURL, parameterAsStrings); err != nil {
-		fmt.Println("error in repalaced rotue")
+		fmt.Println("error in replace route")
 		return ""
 	} else {
 		return replacedRoute
 	}
 }
 
+// Addprefix prepends a prefix string to the router's existing prefix configuration.
 func (myRouter *MyRouter) Addprefix(prefix string) *MyRouter {
 
 	myRouter.prefix = prefix + myRouter.prefix
 	return myRouter
 }
 
-func (myRouter *MyRouter) Getmiddlewares() []middlewarestdlib.Middleware {
-	return myRouter.middlewares
-}
-
+// AddmiddlewareGroup registers a group of global middlewares onto the router.
 func (myRouter *MyRouter) AddmiddlewareGroup(middlewares middlewarestdlib.MiddlewareGroup) *MyRouter {
 	for _, middleware := range middlewares {
 		myRouter.middlewares = append(myRouter.middlewares, middleware)
@@ -184,14 +193,14 @@ func (myRouter *MyRouter) AddmiddlewareGroup(middlewares middlewarestdlib.Middle
 	return myRouter
 }
 
+// Addmiddleware appends a single global middleware to the router.
 func (myRouter *MyRouter) Addmiddleware(middleware middlewarestdlib.Middleware) *MyRouter {
 	myRouter.middlewares = append(myRouter.middlewares, middleware)
 	return myRouter
 }
 
-// RegisterRoutes
-//
-// Responsibile for register all the routes to the route provider
+// RegisterRoutes registers all defined router Handlers into the provided net/http.ServeMux,
+// injecting global and route-specific middleware chains along the way.
 func (router *MyRouter) RegisterRoutes(r *http.ServeMux) {
 	for _, route := range router.Handlers {
 
@@ -222,7 +231,7 @@ func (router *MyRouter) RegisterRoutes(r *http.ServeMux) {
 	}
 }
 
-func (router *MyRouter) Groups(basePath string, Indexes ...*Route) {
+func (router *MyRouter) groups(basePath string, Indexes ...*Route) {
 	var x = len(Indexes)
 	var handlerLength = len(router.Handlers)
 	for i := len(router.Handlers) - 1; i >= handlerLength-x; i-- {
@@ -231,7 +240,7 @@ func (router *MyRouter) Groups(basePath string, Indexes ...*Route) {
 
 }
 
-func (router *MyRouter) GroupsWithMiddleware(basePath string, middleware middlewarestdlib.Middleware, Indexes ...*Route) {
+func (router *MyRouter) groupsWithMiddleware(basePath string, middleware middlewarestdlib.Middleware, Indexes ...*Route) {
 	var x = len(Indexes)
 	var handlerLength = len(router.Handlers)
 	for i := len(router.Handlers) - 1; i >= handlerLength-x; i-- {
@@ -240,9 +249,8 @@ func (router *MyRouter) GroupsWithMiddleware(basePath string, middleware middlew
 	}
 }
 
-// Chain
-//
-// applies a series of middleware to a handler
+// chain wraps an http.HandlerFunc with a slice of middlewares, processing them
+// in reverse order (right to left / bottom to top).
 func chain(handler http.HandlerFunc, middlewares middlewarestdlib.MiddlewareGroup) http.HandlerFunc {
 	for i := len(middlewares) - 1; i >= 0; i-- {
 		handler = middlewares[i](handler)
@@ -251,6 +259,8 @@ func chain(handler http.HandlerFunc, middlewares middlewarestdlib.MiddlewareGrou
 	return handler
 }
 
+// saveNamedRoutes registers a route's path into a global map if a name is provided.
+// It panics if a duplicate route name is encountered.
 func saveNamedRoutes(route Route) {
 
 	if route.name == "" {
