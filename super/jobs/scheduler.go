@@ -1,3 +1,13 @@
+// -----------------------------------------------------------------------------
+// Scheduler
+// -----------------------------------------------------------------------------
+//
+// Scheduler triggers periodic background jobs and ensures that:
+// - each job runs on its own ticker loop,
+// - executions do not overlap,
+// - shutdown waits for both ticker loops and active job executions to finish.
+//
+// package jobs contains background job scheduling utilities.
 package jobs
 
 import (
@@ -9,23 +19,14 @@ import (
 	"time"
 )
 
-//
-//-----------------------------------------------------------------------------
-// 							Scheduler
-//-----------------------------------------------------------------------------
-//
-// Scheduler is responsible for scheduling periodic background tasks.
-// Each job runs on its own ticker goroutine and is protected against
-// overlapping executions. Stopping the scheduler gracefully waits for
-// all active jobs to finish before returning.
-
-// Scheduler data structure, to run a job in the background
+// Scheduler manages the lifecycle of periodic jobs.
 type Scheduler struct {
 
-	// ctx is cancelled when Stop is called, signalling all goroutines to exit.
+	// ctx is cancelled when Stop is called. All ticker loops and jobs
+	// should observe this context and exit gracefully.
 	ctx context.Context
 
-	// cancel stops the scheduler and all managed jobs.
+	// cancel stops the scheduler and signals all managed goroutines to shut down.
 	cancel context.CancelFunc
 
 	// scheduler tracks the ticker goroutines created by CreateJob.
@@ -44,9 +45,12 @@ func New() *Scheduler {
 	}
 }
 
-// CreateJob registers and immediately starts scheduling the given Job.
-// Returns a JobHandle and an error — the error is non-nil if the scheduler
-// has already been stopped.
+// CreateJob registers a periodic job and starts its scheduling loop immediately.
+//
+// The job will be triggered on each ticker tick, but a new execution will not
+// start while a previous one is still running.
+//
+// Returns an error if the scheduler has already been stopped.
 func (s *Scheduler) CreateJob(job Job) error {
 
 	job.ctx = s.ctx
@@ -111,8 +115,9 @@ func (s *Scheduler) CreateJob(job Job) error {
 	return nil
 }
 
-// Stop cancels the scheduler context and blocks until all ticker goroutines
-// and all in-flight job executions have finished.
+// Stop cancels the scheduler and waits until:
+// - all ticker loops have exited,
+// - all in-flight jobs have finished.
 func (s *Scheduler) Stop() {
 	// Signal all goroutines to stop accepting new work.
 	s.cancel()

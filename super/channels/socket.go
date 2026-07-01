@@ -1,14 +1,13 @@
-package channels
-
+// ------------------------------------------------------------------------
 //
-//------------------------------------------------------------------------
-// 			WebSocketMessageProvider / WebSocketMessage
-//------------------------------------------------------------------------
+//	WebSocketMessageProvider / WebSocketMessage
+//
+// ------------------------------------------------------------------------
 //
 // WebSocketMessageProvider is reponsible for providing logic
 // That allowed a section in the code to send a message to a
 // Websocket hub,
-//
+package channels
 
 // WebSocket Message
 //
