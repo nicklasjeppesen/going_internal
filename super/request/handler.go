@@ -78,6 +78,7 @@ func CallUnknownFunc(fn interface{}, argStrings []string, w http.ResponseWriter,
 
 			err, value := handleStructValue(w, r, paramType)
 			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 
@@ -146,6 +147,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request, paramType reflect.Typ
 
 func handleRequestBody(w http.ResponseWriter, r *http.Request, requestBodyStruct reflect.Type) (error, reflect.Value) {
 	if err, requestBodyField := getRequestBodyFieldBody(w, r, requestBodyStruct); err != nil {
+		fmt.Println("Error in hanndleRequestBody")
 		return err, reflect.Value{}
 	} else {
 		return nil, buildRequestBody(requestBodyStruct, w, r, requestBodyField)
