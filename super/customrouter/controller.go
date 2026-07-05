@@ -27,9 +27,19 @@ import (
 // when registering the route (e.g. Get("/x", c, "Show") -> action "Show").
 type BeforeAction struct {
 	Name    string
-	Only    []string
-	Except  []string
+	only    []string
+	except  []string
 	Handler func(w http.ResponseWriter, r *http.Request) bool
+}
+
+func (b *BeforeAction) Only(actions ...string) *BeforeAction {
+	b.only = actions
+	return b
+}
+
+func (b *BeforeAction) Except(actions ...string) *BeforeAction {
+	b.except = actions
+	return b
 }
 
 // AfterAction is the "after" counterpart to BeforeAction. It always runs
@@ -58,36 +68,48 @@ type AfterAction struct {
 //		return c
 //	}
 type BaseController struct {
-	beforeActions []BeforeAction
-	afterActions  []AfterAction
+	beforeActions []*BeforeAction
+	afterActions  []*AfterAction
 }
 
 // AddBeforeAction registers a before-hook on the controller.
-func (b *BaseController) AddBeforeAction(action BeforeAction) {
-	b.beforeActions = append(b.beforeActions, action)
+func (b *BaseController) AddBeforeAction(Name string, action func(w http.ResponseWriter, r *http.Request) bool) *BeforeAction {
+	var before = &BeforeAction{
+		Name:    Name,
+		Handler: action,
+	}
+	b.beforeActions = append(b.beforeActions, before)
+	return before
 }
 
-// AddAfterAction registers an after-hook on the controller.
-func (b *BaseController) AddAfterAction(action AfterAction) {
-	b.afterActions = append(b.afterActions, action)
+// AddAfterAction registers an after-hook on the controllser.
+func (b *BaseController) AddAfterAction(Name string, action func(w http.ResponseWriter, r *http.Request)) *AfterAction {
+	var after = &AfterAction{
+		Name:    Name,
+		Handler: action,
+	}
+	b.afterActions = append(b.afterActions, after)
+	return after
 }
 
 // BeforeActions returns the hooks registered via AddBeforeAction, in order.
-func (b *BaseController) BeforeActions() []BeforeAction { return b.beforeActions }
+func (b *BaseController) BeforeActions() []*BeforeAction {
+	return b.beforeActions
+}
 
 // AfterActions returns the hooks registered via AddAfterAction, in order.
-func (b *BaseController) AfterActions() []AfterAction { return b.afterActions }
+func (b *BaseController) AfterActions() []*AfterAction { return b.afterActions }
 
 // beforeActionProvider / afterActionProvider are satisfied by BaseController
 // (via the embedded methods above). The router type-asserts against these
 // rather than against BaseController directly, so a controller isn't forced
 // to embed exactly that struct if it wants to provide the hooks another way.
 type beforeActionProvider interface {
-	BeforeActions() []BeforeAction
+	BeforeActions() []*BeforeAction
 }
 
 type afterActionProvider interface {
-	AfterActions() []AfterAction
+	AfterActions() []*AfterAction
 }
 
 // actionApplies implements the Only/Except matching rules described on BeforeAction.
@@ -123,19 +145,19 @@ func buildControllerAction(container *Container, controller interface{}, methodN
 	resolved := ResolveDependencies(container, controller)
 	action := resolveControllerMethod(resolved, methodName)
 
-	var befores []BeforeAction
+	var befores []*BeforeAction
 	if provider, ok := resolved.(beforeActionProvider); ok {
 		befores = provider.BeforeActions()
 	}
 
-	var afters []AfterAction
+	var afters []*AfterAction
 	if provider, ok := resolved.(afterActionProvider); ok {
 		afters = provider.AfterActions()
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		for _, before := range befores {
-			if !actionApplies(methodName, before.Only, before.Except) {
+			if !actionApplies(methodName, before.only, before.except) {
 				continue
 			}
 			if !before.Handler(w, r) {
