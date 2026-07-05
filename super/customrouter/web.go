@@ -334,10 +334,11 @@ func (router *MyRouter) RegisterRoutes(r *http.ServeMux) {
 	for _, route := range router.Handlers {
 		var handler = route.handler
 		var middlewares = route.middleware
+		var RouterMiddleware = router.middlewares
 
 		switch route.httpType {
 		case "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS":
-			r.HandleFunc(route.httpType+" "+route.path, chain(handler, middlewares))
+			r.HandleFunc(route.httpType+" "+route.path, chain(chain(handler, middlewares), RouterMiddleware))
 		default:
 			log.Printf("Unsupported HTTP method: %s\n", route.httpType)
 		}
