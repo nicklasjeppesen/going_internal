@@ -122,70 +122,61 @@ func (router *MyRouter) OPTIONS(path string, handler interface{}) *Route {
 
 // ---- Dependency injection container ----
 
-// Container is a minimal DI container that maps an interface type to a concrete
-// instance implementing it. It's used to resolve the parameters of a controller's
-// Loader(...) method.
+// binding is one entry in the container: a not-yet-called factory, built
+// lazily on first resolve and then cached.
+type binding struct {
+	instance reflect.Value
+	factory  reflect.Value
+}
+
+// Container is a minimal DI container that maps a type (normally an
+// interface) to a factory function that produces it. It's used to resolve
+// the parameters of a controller's Loader(...) method.
 type Container struct {
-	services map[reflect.Type]reflect.Value
+	bindings map[reflect.Type]*binding
 }
 
 // NewContainer creates an empty DI container.
 func NewContainer() *Container {
-	return &Container{services: map[reflect.Type]reflect.Value{}}
+	return &Container{bindings: map[reflect.Type]*binding{}}
 }
 
-// Register binds an interface type to a concrete instance.
+// Register binds a type to a zero-argument factory function. The type is
+// inferred from the factory's return type. The dependency is built lazily —
+// the first time it's actually resolved — and then cached (singleton) for
+// subsequent resolves:
 //
-// Because Go can't derive an interface's reflect.Type from a value (you'd get
-// the concrete type instead), pass a nil pointer to the interface as the first
-// argument:
+// Example:
 //
-//	container.Register((*Logger)(nil), myLoggerImpl)
-//	container.Register((*UserRepo)(nil), myUserRepoImpl)
-func (c *Container) Register(ifaceNilPtr interface{}, instance interface{}) *Container {
-	// 1. Tjek om ifaceNilPtr overhovedet er en pointer
-	ifaceNilType := reflect.TypeOf(ifaceNilPtr)
-	if ifaceNilType == nil || ifaceNilType.Kind() != reflect.Ptr {
-		panic(fmt.Sprintf("customrouter: det første argument skal være en nil-pointer til et interface, f.eks. (*helper.ILogger)(nil), men fik %T", ifaceNilPtr))
+//	container.Register(func() helper.ILogger {
+//		return new(Logger)
+//	})
+//	container.Register(func() helper.ILogger { return new(Logger) })
+func (c *Container) Register(factory interface{}) *Container {
+	factoryType := reflect.TypeOf(factory)
+	if factoryType == nil || factoryType.Kind() != reflect.Func {
+		panic("customrouter: Register expects a func, e.g. func() helper.ILogger { ... }")
 	}
-
-	// Hent selve interfacetypen (pak pointeren ud)
-	ifaceType := ifaceNilType.Elem()
-
-	// Tjek om det udpakkede element rent faktisk ER et interface
-	if ifaceType.Kind() != reflect.Interface {
-		panic(fmt.Sprintf("customrouter: pointeren skal pege på et interface, men peger på %s", ifaceType.Kind()))
+	if factoryType.NumIn() != 0 || factoryType.NumOut() != 1 {
+		panic("customrouter: factory passed to Register must take no arguments and return exactly one value, e.g. func() helper.ILogger")
 	}
-
-	instanceType := reflect.TypeOf(instance)
-	instanceValue := reflect.ValueOf(instance)
-
-	// 2. Tjek om den indsendte type implementerer interfacet direkte
-	if instanceType.Implements(ifaceType) {
-		c.services[ifaceType] = instanceValue
-		return c
-	}
-
-	// 3. Hvis ikke, tjek om en POINTER til typen implementerer interfacet
-	if instanceType.Kind() != reflect.Ptr {
-		pointerType := reflect.PtrTo(instanceType)
-		if pointerType.Implements(ifaceType) {
-			// Opret en ny pointer af typen og kopier værdien over i den
-			ptrValue := reflect.New(instanceType)
-			ptrValue.Elem().Set(instanceValue)
-
-			c.services[ifaceType] = ptrValue
-			return c
-		}
-	}
-
-	// Hvis ingen af delene virker, paniker vi
-	panic(fmt.Sprintf("customrouter: %T implementerer ikke %s", instance, ifaceType))
+	returnType := factoryType.Out(0)
+	c.bindings[returnType] = &binding{factory: reflect.ValueOf(factory)}
+	return c
 }
 
 func (c *Container) resolve(t reflect.Type) (reflect.Value, bool) {
-	v, ok := c.services[t]
-	return v, ok
+	b, ok := c.bindings[t]
+	if !ok {
+		return reflect.Value{}, false
+	}
+	if b.instance.IsValid() {
+		return b.instance, true
+	}
+	// Lazy factory: build once, then cache the result.
+	result := b.factory.Call(nil)[0]
+	b.instance = result
+	return result, true
 }
 
 // ---- Controller lifecycle hooks (Rails-style before/after actions) ----
