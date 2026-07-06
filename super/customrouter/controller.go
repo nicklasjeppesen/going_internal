@@ -26,7 +26,7 @@ import (
 type BeforeAction struct {
 	only    []string
 	except  []string
-	Handler func(w http.ResponseWriter, r *http.Request) bool
+	Handler func(request request.Requestbase) bool
 }
 
 func (b *BeforeAction) Only(actions ...string) *BeforeAction {
@@ -45,7 +45,7 @@ func (b *BeforeAction) Except(actions ...string) *BeforeAction {
 type AfterAction struct {
 	only    []string
 	except  []string
-	Handler func(w http.ResponseWriter, r *http.Request)
+	Handler func(request request.Requestbase)
 }
 
 func (b *AfterAction) Only(actions ...string) *AfterAction {
@@ -79,7 +79,7 @@ type BaseController struct {
 }
 
 // AddBeforeAction registers a before-hook on the controller.
-func (b *BaseController) AddBeforeAction(action func(w http.ResponseWriter, r *http.Request) bool) *BeforeAction {
+func (b *BaseController) AddBeforeAction(action func(request request.Requestbase) bool) *BeforeAction {
 	var before = &BeforeAction{
 		Handler: action,
 	}
@@ -88,7 +88,7 @@ func (b *BaseController) AddBeforeAction(action func(w http.ResponseWriter, r *h
 }
 
 // AddAfterAction registers an after-hook on the controllser.
-func (b *BaseController) AddAfterAction(action func(w http.ResponseWriter, r *http.Request)) *AfterAction {
+func (b *BaseController) AddAfterAction(action func(request request.Requestbase)) *AfterAction {
 	var after = &AfterAction{
 		Handler: action,
 	}
@@ -160,11 +160,15 @@ func buildControllerAction(container *Container, controller interface{}, methodN
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		_request := request.Requestbase{W: w, R: r}
+
 		for _, before := range befores {
 			if !actionApplies(methodName, before.only, before.except) {
 				continue
 			}
-			if !before.Handler(w, r) {
+
+			if !before.Handler(_request) {
 				return // aborted — handler is responsible for the response
 			}
 		}
@@ -180,7 +184,7 @@ func buildControllerAction(container *Container, controller interface{}, methodN
 			if !actionApplies(methodName, after.only, after.except) {
 				continue
 			}
-			after.Handler(w, r)
+			after.Handler(_request)
 		}
 	}
 }
