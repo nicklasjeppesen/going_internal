@@ -14,9 +14,7 @@ import (
 // BeforeAction describes a single "before" hook a controller wants to run
 // ahead of one or more of its actions.
 //
-//   - Name is purely for readability/debugging.
 //   - Only, if non-empty, restricts the hook to the listed action (method)
-//     names — anything not listed is skipped.
 //   - Except, if non-empty (and Only is empty), runs the hook for every
 //     action *except* the listed ones.
 //   - If both Only and Except are empty, the hook runs for every action.
@@ -26,7 +24,6 @@ import (
 // Action names are matched case-insensitively against the method name used
 // when registering the route (e.g. Get("/x", c, "Show") -> action "Show").
 type BeforeAction struct {
-	Name    string
 	only    []string
 	except  []string
 	Handler func(w http.ResponseWriter, r *http.Request) bool
@@ -46,10 +43,19 @@ func (b *BeforeAction) Except(actions ...string) *BeforeAction {
 // once the main action has completed (unless a BeforeAction aborted the
 // request first).
 type AfterAction struct {
-	Name    string
-	Only    []string
-	Except  []string
+	only    []string
+	except  []string
 	Handler func(w http.ResponseWriter, r *http.Request)
+}
+
+func (b *AfterAction) Only(actions ...string) *AfterAction {
+	b.only = actions
+	return b
+}
+
+func (b *AfterAction) Except(actions ...string) *AfterAction {
+	b.except = actions
+	return b
 }
 
 // BaseController is meant to be embedded (by value) in your controllers. It
@@ -73,9 +79,8 @@ type BaseController struct {
 }
 
 // AddBeforeAction registers a before-hook on the controller.
-func (b *BaseController) AddBeforeAction(Name string, action func(w http.ResponseWriter, r *http.Request) bool) *BeforeAction {
+func (b *BaseController) AddBeforeAction(action func(w http.ResponseWriter, r *http.Request) bool) *BeforeAction {
 	var before = &BeforeAction{
-		Name:    Name,
 		Handler: action,
 	}
 	b.beforeActions = append(b.beforeActions, before)
@@ -83,9 +88,8 @@ func (b *BaseController) AddBeforeAction(Name string, action func(w http.Respons
 }
 
 // AddAfterAction registers an after-hook on the controllser.
-func (b *BaseController) AddAfterAction(Name string, action func(w http.ResponseWriter, r *http.Request)) *AfterAction {
+func (b *BaseController) AddAfterAction(action func(w http.ResponseWriter, r *http.Request)) *AfterAction {
 	var after = &AfterAction{
-		Name:    Name,
 		Handler: action,
 	}
 	b.afterActions = append(b.afterActions, after)
@@ -173,7 +177,7 @@ func buildControllerAction(container *Container, controller interface{}, methodN
 		request.CallUnknownFunc(action, urlParam, w, r)
 
 		for _, after := range afters {
-			if !actionApplies(methodName, after.Only, after.Except) {
+			if !actionApplies(methodName, after.only, after.except) {
 				continue
 			}
 			after.Handler(w, r)
