@@ -1,29 +1,25 @@
 package validation
 
 import (
-	"fmt"
 	"reflect"
-	"regexp"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
 )
 
-// Should be removed, but here for the example
-func passwordStrength(fl validator.FieldLevel) bool {
-	password := fl.Field().String()
+// validate er den delte validator-instans for hele applikationen.
+// Registrering af custom rules sker via RegisterValidation, og skal ske
+// før serveren begynder at modtage requests.
+var validate = validator.New()
 
-	fmt.Println("Passwrd Strength kaldt")
-	hasUpper := regexp.MustCompile(`[A-Z]`).MatchString(password)
-	hasLower := regexp.MustCompile(`[a-z]`).MatchString(password)
-	hasNumber := regexp.MustCompile(`[0-9]`).MatchString(password)
-
-	return hasUpper && hasLower && hasNumber
+// RegisterValidation lader forbrugere (template-projekter) tilføje deres
+// egne valideringsregler. Ikke thread-safe i forhold til samtidige Validate()-kald,
+// så kald denne ved opstart, aldrig fra en handler.
+func RegisterValidation(tag string, fn validator.Func, callEvenIfNull ...bool) error {
+	return validate.RegisterValidation(tag, fn, callEvenIfNull...)
 }
 
 func Validate[T any](t T) (bool, map[string][]string) {
-	validate := validator.New()
-	validate.RegisterValidation("password_strenght", passwordStrength)
 	err := validate.Struct(t)
 	if err != nil {
 		errorsMap := make(map[string][]string)
