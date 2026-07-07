@@ -1,15 +1,29 @@
 package validation
 
 import (
+	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
-	// Peger på framework's rules loader
 )
+
+// Should be removed, but here for the example
+func passwordStrength(fl validator.FieldLevel) bool {
+	password := fl.Field().String()
+
+	fmt.Println("Passwrd Strength kaldt")
+	hasUpper := regexp.MustCompile(`[A-Z]`).MatchString(password)
+	hasLower := regexp.MustCompile(`[a-z]`).MatchString(password)
+	hasNumber := regexp.MustCompile(`[0-9]`).MatchString(password)
+
+	return hasUpper && hasLower && hasNumber
+}
 
 func Validate[T any](t T) (bool, map[string][]string) {
 	validate := validator.New()
+	validate.RegisterValidation("password_strenght", passwordStrength)
 	err := validate.Struct(t)
 	if err != nil {
 		errorsMap := make(map[string][]string)
