@@ -5,7 +5,6 @@ package customrouter
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"regexp"
 
@@ -16,7 +15,9 @@ import (
 )
 
 // Modifier defines a function signature that processes an HTTP response and request.
-type Modifier func(w http.ResponseWriter, r *http.Request)
+//type Modifier func(w http.ResponseWriter, r *http.Request)
+
+type Modifier = request.Handler
 
 // NewMyRouter creates and initializes a new instance of MyRouter.
 func NewMyRouter() *MyRouter {
@@ -157,27 +158,27 @@ func (router *MyRouter) dispatch(httpType, path string, handlerOrController inte
 //	adminRouter.HandleGet("/dashboard", func(w http.ResponseWriter, r *http.Request) {
 //		w.Write([]byte("Hello from admin dashboard"))
 //	})
-func (router *MyRouter) HandleGet(path string, handler http.HandlerFunc) *Route {
+func (router *MyRouter) HandleGet(path string, handler request.Handler) *Route {
 	return router.rawHandler("GET", path, handler)
 }
 
-func (router *MyRouter) HandlePost(path string, handler http.HandlerFunc) *Route {
+func (router *MyRouter) HandlePost(path string, handler request.Handler) *Route {
 	return router.rawHandler("POST", path, handler)
 }
 
-func (router *MyRouter) HandlePut(path string, handler http.HandlerFunc) *Route {
+func (router *MyRouter) HandlePut(path string, handler request.Handler) *Route {
 	return router.rawHandler("PUT", path, handler)
 }
 
-func (router *MyRouter) HandleDelete(path string, handler http.HandlerFunc) *Route {
+func (router *MyRouter) HandleDelete(path string, handler request.Handler) *Route {
 	return router.rawHandler("DELETE", path, handler)
 }
 
-func (router *MyRouter) HandlePatch(path string, handler http.HandlerFunc) *Route {
+func (router *MyRouter) HandlePatch(path string, handler request.Handler) *Route {
 	return router.rawHandler("PATCH", path, handler)
 }
 
-func (router *MyRouter) HandleOptions(path string, handler http.HandlerFunc) *Route {
+func (router *MyRouter) HandleOptions(path string, handler request.Handler) *Route {
 	return router.rawHandler("OPTIONS", path, handler)
 }
 
@@ -193,7 +194,7 @@ type Route struct {
 	// name of the URL
 	name string
 	// handler: specific handler/controller for the URL
-	handler func(w http.ResponseWriter, r *http.Request)
+	handler request.Handler
 
 	// Middleware: list of middlewares that have to return true, to reach the URL
 	middleware []middlewarestdlib.Middleware
@@ -218,7 +219,7 @@ func (router *MyRouter) httpHandler(HTTPType string, path string, handler interf
 
 // rawHandler is an internal helper that registers a plain http.HandlerFunc
 // with no parameter extraction / reflection dispatch.
-func (router *MyRouter) rawHandler(HTTPType string, path string, handler http.HandlerFunc) *Route {
+func (router *MyRouter) rawHandler(HTTPType string, path string, handler request.Handler) *Route {
 	root := router.rootRouter()
 
 	newRoute := Route{
@@ -235,13 +236,13 @@ func (router *MyRouter) rawHandler(HTTPType string, path string, handler http.Ha
 
 // Take an controller function (handler) and wrap it in a net/http.ServeMux request
 func routeHandler(handler interface{}) Modifier {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var urlParamKeys = extractPathParams(r.Pattern)
+	return func(req *request.Requestbase) {
+		var urlParamKeys = extractPathParams(req.R.Pattern)
 		var urlParam = []string{}
 		for _, key := range urlParamKeys {
-			urlParam = append(urlParam, r.PathValue(key))
+			urlParam = append(urlParam, req.R.PathValue(key))
 		}
-		request.CallUnknownFunc(handler, urlParam, w, r)
+		request.CallUnknownFunc(handler, urlParam, req.W, req.R)
 	}
 }
 
@@ -268,7 +269,7 @@ func (router *Route) Name(name string) *Route {
 
 // AddMiddleware adds one or more route-specific middlewares to the Route.
 // These are processed sequentially before reaching the route's final handler.
-func (router *Route) AddMiddleware(middlewares ...func(http.HandlerFunc) http.HandlerFunc) *Route {
+func (router *Route) AddMiddleware(middlewares ...middlewarestdlib.Middleware) *Route {
 	for _, middleware := range middlewares {
 		router.middleware = append(router.middleware, middleware)
 	}
@@ -332,6 +333,19 @@ func (myRouter *MyRouter) Addmiddleware(middleware middlewarestdlib.Middleware) 
 // resolved (prefixes baked in), so no extra prefix is applied here.
 func (router *MyRouter) RegisterRoutes(r *http.ServeMux) {
 	for _, route := range router.Handlers {
+		final := chain(chain(route.handler, route.middleware), router.middlewares)
+
+		r.HandleFunc(route.httpType+" "+route.path, func(w http.ResponseWriter, req *http.Request) {
+			final(&request.Requestbase{W: w, R: req})
+		})
+
+		saveNamedRoutes(route)
+	}
+}
+
+/*
+func (router *MyRouter) RegisterRoutes(r *http.ServeMux) {
+	for _, route := range router.Handlers {
 		var handler = route.handler
 		var middlewares = route.middleware
 		var RouterMiddleware = router.middlewares
@@ -345,15 +359,22 @@ func (router *MyRouter) RegisterRoutes(r *http.ServeMux) {
 
 		saveNamedRoutes(route)
 	}
-}
+}*/
 
 // chain wraps an http.HandlerFunc with a slice of middlewares, processing them
 // in reverse order (right to left / bottom to top).
-func chain(handler http.HandlerFunc, middlewares middlewarestdlib.MiddlewareGroup) http.HandlerFunc {
+/*func chain(handler http.HandlerFunc, middlewares middlewarestdlib.MiddlewareGroup) http.HandlerFunc {
 	for i := len(middlewares) - 1; i >= 0; i-- {
 		handler = middlewares[i](handler)
 	}
 
+	return handler
+}*/
+
+func chain(handler request.Handler, middlewares middlewarestdlib.MiddlewareGroup) request.Handler {
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		handler = middlewares[i](handler)
+	}
 	return handler
 }
 

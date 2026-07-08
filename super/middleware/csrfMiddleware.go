@@ -15,6 +15,7 @@ import (
 	"time"
 
 	constants "github.com/nicklasjeppesen/going_internal/super/constants"
+	"github.com/nicklasjeppesen/going_internal/super/request"
 )
 
 // More work is needed here: https://themsaid.com/csrf-protection-go-web-applications
@@ -27,22 +28,23 @@ type Input struct {
 	Csrf_token string `json:"csrf_token"`
 }
 
-func CsrfMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func CsrfMiddleware(next request.Handler) request.Handler {
+	return func(req *request.Requestbase) {
 
-		if r.Method == http.MethodGet {
+		if req.R.Method == http.MethodGet {
 
-			cookie, err := r.Cookie(constants.Csrf_token)
+			cookie, err := req.R.Cookie(constants.Csrf_token)
 
 			if err == nil && cookie.Valid() == nil {
-				ctx := context.WithValue(r.Context(), constants.Csrf_token, cookie.Value)
-				next.ServeHTTP(w, r.WithContext(ctx))
+				ctx := context.WithValue(req.R.Context(), constants.Csrf_token, cookie.Value)
+
+				next(req.Withcontext(ctx))
 				return
 			}
 
 			csfrToken := generateToken()
 
-			http.SetCookie(w, &http.Cookie{
+			http.SetCookie(req.W, &http.Cookie{
 				Name:     constants.Csrf_token,
 				Value:    csfrToken,
 				Expires:  time.Now().Add(1 * time.Hour),
@@ -51,34 +53,34 @@ func CsrfMiddleware(next http.HandlerFunc) http.HandlerFunc {
 				SameSite: http.SameSiteStrictMode,
 			})
 
-			ctx := context.WithValue(r.Context(), constants.Csrf_token, csfrToken)
-			next.ServeHTTP(w, r.WithContext(ctx))
+			ctx := context.WithValue(req.R.Context(), constants.Csrf_token, csfrToken)
+			next(req.Withcontext(ctx))
 			return
 		}
 
 		// For POST/PUT/DELETE requests, Validate
-		cookie, err := r.Cookie(constants.Csrf_token)
+		cookie, err := req.R.Cookie(constants.Csrf_token)
 		if err != nil {
-			http.Error(w, "CSRF cookie missing", http.StatusUnauthorized)
+			http.Error(req.W, "CSRF cookie missing", http.StatusUnauthorized)
 			return
 		}
 
-		contentType := r.Header.Get("Content-Type")
+		contentType := req.R.Header.Get("Content-Type")
 		var token string
 		if strings.HasPrefix(contentType, "application/json") {
-			token = CSRFTokenFromJson(w, r)
+			token = CSRFTokenFromJson(req.W, req.R)
 		} else {
-			token = CSRFTokenFromHttp(w, r, contentType)
+			token = CSRFTokenFromHttp(req.W, req.R, contentType)
 		}
 
 		if token == "" || token != cookie.Value {
-			http.Error(w, "Invalid CSRF token", http.StatusUnauthorized)
+			http.Error(req.W, "Invalid CSRF token", http.StatusUnauthorized)
 			return
 		}
 
-		next.ServeHTTP(w, r)
+		next(req)
 
-	})
+	}
 }
 
 func CSRFTokenFromHttp(w http.ResponseWriter, r *http.Request, contentType string) string {

@@ -1,6 +1,7 @@
 package request
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -9,9 +10,16 @@ import (
 	. "github.com/nicklasjeppesen/going_internal/super/validation"
 )
 
+type Handler func(req *Requestbase)
+
 type Requestbase struct {
 	W http.ResponseWriter // index 0, DO NOT REORDER
 	R *http.Request       // index 1, DO NOT REORDER
+}
+
+func (r *Requestbase) Withcontext(ctx context.Context) *Requestbase {
+	r.R = r.R.WithContext(ctx)
+	return r
 }
 
 // If input is empty, it print the Request Body

@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	web "github.com/nicklasjeppesen/going_internal/super/customrouter"
+	middlewarestdlib "github.com/nicklasjeppesen/going_internal/super/middleware"
 )
 
 //-----------------------------------------------------------------
@@ -37,7 +38,7 @@ func (socket *Router) UseContainer(container *web.Container) *Router {
 	return socket
 }
 
-func (socket *Router) MapHub(path string, hub IBaseHub, middlewares ...func(http.HandlerFunc) http.HandlerFunc) {
+func (socket *Router) MapHub(path string, hub IBaseHub, middlewares ...middlewarestdlib.Middleware) {
 
 	hub = resolveHub(socket.container, hub)
 

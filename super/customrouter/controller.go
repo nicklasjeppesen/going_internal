@@ -2,7 +2,6 @@ package customrouter
 
 import (
 	"fmt"
-	"net/http"
 	"reflect"
 	"strings"
 
@@ -159,32 +158,32 @@ func buildControllerAction(container *Container, controller interface{}, methodN
 		afters = provider.AfterActions()
 	}
 
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(req *request.Requestbase) {
 
-		_request := request.Requestbase{W: w, R: r}
+		//_request := request.Requestbase{W: w, R: r}
 
 		for _, before := range befores {
 			if !actionApplies(methodName, before.only, before.except) {
 				continue
 			}
 
-			if !before.Handler(_request) {
+			if !before.Handler(*req) {
 				return // aborted — handler is responsible for the response
 			}
 		}
 
-		var urlParamKeys = extractPathParams(r.Pattern)
+		var urlParamKeys = extractPathParams(req.R.Pattern)
 		var urlParam []string
 		for _, key := range urlParamKeys {
-			urlParam = append(urlParam, r.PathValue(key))
+			urlParam = append(urlParam, req.R.PathValue(key))
 		}
-		request.CallUnknownFunc(action, urlParam, w, r)
+		request.CallUnknownFunc(action, urlParam, req.W, req.R)
 
 		for _, after := range afters {
 			if !actionApplies(methodName, after.only, after.except) {
 				continue
 			}
-			after.Handler(_request)
+			after.Handler(*req)
 		}
 	}
 }
