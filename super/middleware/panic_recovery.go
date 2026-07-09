@@ -10,6 +10,9 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strings"
+
+	constants "github.com/nicklasjeppesen/going_internal/super/constants"
+	"github.com/nicklasjeppesen/going_internal/super/util"
 )
 
 type StackFrame struct {
@@ -63,10 +66,11 @@ func PanicRecovery(next http.Handler) http.Handler {
 					GoVersion:    runtime.Version(),
 				}
 
+				debugMode := util.GetEnv(constants.APP_Debug, "") == "true"
 				w.WriteHeader(http.StatusInternalServerError)
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
-				if tmpl != nil {
+				if tmpl != nil && debugMode {
 					if renderErr := tmpl.ExecuteTemplate(w, "500.html", errorData); renderErr != nil {
 						log.Printf("Failed to render error template: %v", renderErr)
 						http.Error(w, "Internal Server Error", http.StatusInternalServerError)
