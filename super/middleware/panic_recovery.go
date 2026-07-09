@@ -153,17 +153,3 @@ func readSourceLines(file string, errorLine int, context int) []SourceLine {
 	}
 	return lines
 }
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
