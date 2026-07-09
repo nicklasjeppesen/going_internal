@@ -41,9 +41,7 @@ type ErrorPageData struct {
 }
 
 func PanicRecovery(next http.Handler) http.Handler {
-	tmpl, err := template.New("error").Funcs(template.FuncMap{
-		"add": func(a, b int) int { return a + b },
-	}).ParseFiles("internal/resources/templates/errors/500.html")
+	tmpl, err := template.New("error").ParseFiles("internal/resources/templates/errors/500.html")
 	if err != nil {
 		log.Printf("WARNING: Could not load 500 template: %v", err)
 		tmpl = nil
