@@ -17,7 +17,7 @@ type BelongsToManyRelation[T IDBConnection[T]] struct {
 	relation      IRepository
 	callerMethod  string
 
-	QueryModifiers[T]
+	QueryModifiers[T, *BelongsToManyRelation[T]]
 	wherePivots   []whereCondition // filter on pivot-tabel
 	wherePivotsIn []whereCondition // filtre on pivot-tabel
 	orderByPivots []orderCondition // sorting on pivot-tabel
@@ -30,6 +30,16 @@ func (belong *BelongsToManyRelation[T]) WherePivot(column string, values ...any)
 
 func (belong *BelongsToManyRelation[T]) WherePivotIn(column string, values []any) *BelongsToManyRelation[T] {
 	belong.wherePivotsIn = append(belong.wherePivots, whereCondition{column: column, values: values})
+	return belong
+}
+
+func (belong *BelongsToManyRelation[T]) OrderByPivot(column string) *BelongsToManyRelation[T] {
+	belong.orderByPivots = append(belong.orderByPivots, orderCondition{column: column, desc: false})
+	return belong
+}
+
+func (belong *BelongsToManyRelation[T]) OrderByPivotDesc(column string) *BelongsToManyRelation[T] {
+	belong.orderByPivots = append(belong.orderByPivots, orderCondition{column: column, desc: true})
 	return belong
 }
 
@@ -324,6 +334,7 @@ func NewBelongsToMany[T IDBConnection[T]](current T, relationToEntiy IRepository
 	relation.pivotTable = PivotTableName(childParentTable, parentTable)
 	relation.localKey = parentTable + "_id"
 	relation.foreignKey = childParentTable + "_id"
+	relation.newQueryModifiers(&relation)
 
 	return &relation
 }

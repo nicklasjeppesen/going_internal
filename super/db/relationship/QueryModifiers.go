@@ -16,31 +16,40 @@ type orderCondition struct {
 
 // Querymidifier contains where/whereIn/OrderBy-condition, that skal be use on the relation entity (T)
 // This allow filtering and sorting to be implemented
-type QueryModifiers[T IDBConnection[T]] struct {
+type QueryModifiers[T IDBConnection[T], R any] struct {
+	self     R
 	wheres   []whereCondition
 	wheresIn []whereCondition
 	orderBys []orderCondition
 }
 
-func (q *QueryModifiers[T]) Where(column string, values ...any) {
+func (q *QueryModifiers[T, R]) newQueryModifiers(self R) {
+	q.self = self
+}
+
+func (q *QueryModifiers[T, R]) Where(column string, values ...any) R {
 	q.wheres = append(q.wheres, whereCondition{column: column, values: values})
+	return q.self
 }
 
-func (q *QueryModifiers[T]) WhereIn(column string, values []any) {
-	q.wheres = append(q.wheresIn, whereCondition{column: column, values: values})
+func (q *QueryModifiers[T, R]) WhereIn(column string, values []any) R {
+	q.wheresIn = append(q.wheresIn, whereCondition{column: column, values: values})
+	return q.self
 }
 
-func (q *QueryModifiers[T]) OrderBy(column string) {
+func (q *QueryModifiers[T, R]) OrderBy(column string) R {
 	q.orderBys = append(q.orderBys, orderCondition{column: column, desc: false})
+	return q.self
 }
 
-func (belong *BelongsToManyRelation[T]) OrderByDesc(column string) *BelongsToManyRelation[T] {
-	belong.orderBys = append(belong.orderBys, orderCondition{column: column, desc: true})
-	return belong
+func (q *QueryModifiers[T, R]) OrderByDesc(column string) R {
+	q.orderBys = append(q.orderBys, orderCondition{column: column, desc: true})
+	return q.self
+	//sreturn belong
 }
 
 // Apply kører de gemte betingelser på query/T og returnerer den (chainbare) query klar til .Get().
-func (q *QueryModifiers[T]) Apply(query T) T {
+func (q *QueryModifiers[T, R]) Apply(query T) T {
 	for _, w := range q.wheres {
 		query = query.Where(w.column, w.values...)
 	}
