@@ -7,17 +7,67 @@ import (
 	. "github.com/nicklasjeppesen/going_internal/super/db/types"
 )
 
+type whereCondition struct {
+	column string
+	values []any
+}
+
+type orderCondition struct {
+	column string
+	desc   bool
+}
+
 type BelongsToManyRelation[T IDBConnection[T]] struct {
 	pivotTable    string
 	Holder        T      // The relationship DB
 	localKey      string // Local key in foreign tabel
 	foreignKey    string // ForeignKey, ex. tabel user has company_id, then company_id foreignKey
-	superMapper   func(T)
 	pivotsColumns []string
 	primaryId     any
 	relation      IRepository
-	//relationToEntiy IRepository
-	callerMeethod string
+	callerMethod  string
+
+	wheres        []whereCondition // filtre på hovedrelationen (Holder)
+	wheresIn      []whereCondition // filtre på hovedrelationen (Holder)
+	orderBys      []orderCondition // sortering på hovedrelationen (Holder)
+	wherePivots   []whereCondition // filtre på pivot-tabellen
+	wherePivotsIn []whereCondition // filtre på pivot-tabellen
+	orderByPivots []orderCondition // sortering på pivot-tabellen
+}
+
+func (belong *BelongsToManyRelation[T]) Where(column string, values ...any) *BelongsToManyRelation[T] {
+	belong.wheres = append(belong.wheres, whereCondition{column: column, values: values})
+	return belong
+}
+
+func (belong *BelongsToManyRelation[T]) WhereIn(column string, values []any) *BelongsToManyRelation[T] {
+	belong.wheresIn = append(belong.wheres, whereCondition{column: column, values: values})
+	return belong
+}
+
+func (belong *BelongsToManyRelation[T]) WherePivot(column string, values ...any) *BelongsToManyRelation[T] {
+	belong.wherePivots = append(belong.wherePivots, whereCondition{column: column, values: values})
+	return belong
+}
+
+func (belong *BelongsToManyRelation[T]) WherePivotIn(column string, values []any) *BelongsToManyRelation[T] {
+	belong.wherePivotsIn = append(belong.wherePivots, whereCondition{column: column, values: values})
+	return belong
+}
+
+func (belong *BelongsToManyRelation[T]) OrderBy(column string) *BelongsToManyRelation[T] {
+	belong.orderBys = append(belong.orderBys, orderCondition{column: column, desc: false})
+	return belong
+}
+
+func (belong *BelongsToManyRelation[T]) OrderByDesc(column string) *BelongsToManyRelation[T] {
+	belong.orderBys = append(belong.orderBys, orderCondition{column: column, desc: true})
+	return belong
+}
+
+func (belong *BelongsToManyRelation[T]) OrderByPivot(column string, desc ...bool) *BelongsToManyRelation[T] {
+	belong.orderByPivots = append(belong.orderByPivots, orderCondition{column: column, desc: len(desc) > 0 && desc[0]})
+	return belong
 }
 
 func (belong *BelongsToManyRelation[T]) ForeignKey(column string) *BelongsToManyRelation[T] {
@@ -50,7 +100,7 @@ func (belong *BelongsToManyRelation[T]) GetName() string {
 }
 
 func (belong *BelongsToManyRelation[T]) Items() collections.Collection[T] {
-	if relation := belong.relation.GetRelationshipHolder(belong.callerMeethod); len(relation) != 0 {
+	if relation := belong.relation.GetRelationshipHolder(belong.callerMethod); len(relation) != 0 {
 		if collec, err := relation[0].(collections.Collection[T]); err == true {
 			return collec
 		}
@@ -66,7 +116,7 @@ func (belong *BelongsToManyRelation[T]) Load() {
 	}
 
 	var relationsObjects = belong.getRelations(pivotsmap)[belong.relation.PrimaryKey()]
-	belong.relation.SetRelationshipHolder(belong.callerMeethod, relationsObjects)
+	belong.relation.SetRelationshipHolder(belong.callerMethod, relationsObjects)
 }
 
 // relationHolder: define the object with belongs to many relationships
@@ -125,11 +175,24 @@ func (belong *BelongsToManyRelation[T]) pivotsResults(ids []any) [][]any {
 	pivotDriver := belong.Holder.DB(belong.Holder.GetCtx()).GetDriver()
 	pivotDriver.SetTable(belong.pivotTable)
 
-	pivotsResults := pivotDriver.
-		WhereIn_(belong.localKey, ids).
-		Get_(belong.Holder.DbConn(), belong.pivotColumns())
+	pivotDriver.WhereIn_(belong.localKey, ids)
 
-	return pivotsResults
+	for _, w := range belong.wherePivots {
+		pivotDriver.Where_(w.column, w.values)
+	}
+
+	for _, w := range belong.wherePivotsIn {
+		pivotDriver.WhereIn_(w.column, w.values)
+	}
+
+	for _, o := range belong.orderByPivots {
+		if o.desc {
+			pivotDriver.OrderByDesc_(o.column)
+		} else {
+			pivotDriver.OrderBy_(o.column)
+		}
+	}
+	return pivotDriver.Get_(belong.Holder.DbConn(), belong.pivotColumns())
 }
 
 // Get columns for the pivot tables
@@ -164,9 +227,27 @@ func (belong *BelongsToManyRelation[T]) getRelations(pivots []map[string]any) ma
 		relationMap[foreignValue] = append(relationMap[foreignValue], pivot)
 	}
 
+	query := belong.Holder.WhereIn(belong.Holder.PrimaryKeyName(), relationsIds)
+
+	for _, w := range belong.wheres {
+		query = query.Where(w.column, w.values...)
+	}
+
+	for _, w := range belong.wheresIn {
+		query = query.WhereIn(w.column, w.values)
+	}
+
+	for _, o := range belong.orderBys {
+		if o.desc {
+			query = query.OrderByDesc(o.column)
+		} else {
+			query = query.OrderBy(o.column)
+		}
+	}
+
 	// Step 3: get the relationships value, and track bag all the values, and set the relationship holder.
 	var resultsSet = map[any]collections.Collection[T]{}
-	var relationObjects = belong.Holder.WhereIn(belong.Holder.PrimaryKeyName(), relationsIds).Get()
+	var relationObjects = query.Get()
 	for _, relation := range relationObjects { // chats
 
 		var relationshipHolderIds = relationMap[relation.PrimaryKey()]
@@ -283,10 +364,10 @@ func (belong *BelongsToManyRelation[T]) UpdateExistingPivot(input map[any]map[st
 func NewBelongsToMany[T IDBConnection[T]](current T, relationToEntiy IRepository) *BelongsToManyRelation[T] {
 
 	var relation = BelongsToManyRelation[T]{
-		Holder:        current,
-		primaryId:     current.PrimaryKey(),
-		relation:      relationToEntiy,
-		callerMeethod: CallerMethodName(),
+		Holder:       current,
+		primaryId:    current.PrimaryKey(),
+		relation:     relationToEntiy,
+		callerMethod: CallerMethodName(),
 	}
 
 	// Create basis object
