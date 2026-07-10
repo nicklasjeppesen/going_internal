@@ -16,7 +16,7 @@ type orderCondition struct {
 
 // Querymidifier contains where/whereIn/OrderBy-condition, that skal be use on the relation entity (T)
 // This allow filtering and sorting to be implemented
-type QueryModifiers[T IDBConnection[T], R any] struct {
+type QueryModifiers[T IDB[T], R any] struct {
 	self     R
 	wheres   []whereCondition
 	wheresIn []whereCondition
