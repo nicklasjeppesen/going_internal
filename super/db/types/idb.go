@@ -2,25 +2,18 @@ package types
 
 import (
 	"context"
-	"database/sql"
 
 	. "github.com/nicklasjeppesen/going_internal/super/collections"
 )
 
-/*
-*
-* Used on the relations structs
- */
+// Used on the relations structs
 type IDBConnection[T IRepository] interface {
 	IDB[T]
 	GetDriver() IDrivers
-	DbConn() *sql.DB
+	DbConn() DBTX
 }
 
-/*
-*
-* Combine all interfaces a for specific Application ActiveRecord (DB ORM)
- */
+// Combine all interfaces a for specific Application ActiveRecord (DB ORM)
 type IDB[T IRepository] interface {
 	IParent[T]
 	IModels[T]
@@ -42,6 +35,8 @@ type IParent[T IRepository] interface {
 	GetWith() []string
 	OrderByDesc(column string) T
 	OrderBy(column string) T
+	LockForUpdate() T
+	SharedLock() T
 }
 
 /*

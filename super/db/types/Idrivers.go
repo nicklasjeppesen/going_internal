@@ -4,12 +4,9 @@ import (
 	"database/sql"
 )
 
-/*
-*
-* The Concret SQL connection driver,
-* This interface specified functions a SQL driver have to implement
-* To be used in the system
- */
+// The Concret SQL connection driver,
+// This interface specified functions a SQL driver have to implement
+// To be used in the system
 type IDrivers interface {
 	// Non terminnate function
 	Open(connectionString string) *sql.DB
@@ -21,13 +18,15 @@ type IDrivers interface {
 	OrderByDesc_(column string)
 	Limit_(max int)
 	OffSet_(int)
+	LockForUpdate_()
+	SharedLock_()
 
 	// Terminate functions
-	Get_(_db *sql.DB, columns []string) [][]any
-	Save_(_db *sql.DB, columns []string, values []any, returningValues []string) []any
-	First_(_db *sql.DB, columns []string) []any // returning columns
-	Update_(_db *sql.DB, columns []string, values []any)
-	Delete_(_db *sql.DB, id any) error
+	Get_(_db DBTX, columns []string) [][]any
+	Save_(_db DBTX, columns []string, values []any, returningValues []string) []any
+	First_(_db DBTX, columns []string) []any // returning columns
+	Update_(_db DBTX, columns []string, values []any)
+	Delete_(_db DBTX, id any) error
 
 	// support functions
 	CreateMigrationTable() string

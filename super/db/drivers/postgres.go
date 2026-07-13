@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/nicklasjeppesen/going_internal/super/constants"
 	types "github.com/nicklasjeppesen/going_internal/super/db/types"
@@ -29,6 +30,7 @@ type PostgresDB struct {
 	orderBy          []string // What column shall be
 	offSet           int
 	withOffSet       bool
+	lockClause       string
 	ctx              context.Context
 	connectionString string
 }
@@ -59,6 +61,7 @@ func (parent *PostgresDB) Clone() types.IDrivers {
 func (parent *PostgresDB) Open(connectionString string) *sql.DB {
 
 	_db, err := sql.Open("postgres", connectionString)
+	_db.SetConnMaxIdleTime(10 * time.Minute)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -67,9 +70,8 @@ func (parent *PostgresDB) Open(connectionString string) *sql.DB {
 
 // Actions
 
-func (parent *PostgresDB) Get_(_db *sql.DB, columns []string) [][]any {
+func (parent *PostgresDB) Get_(_db types.DBTX, columns []string) [][]any {
 
-	defer _db.Close()
 	var query = parent.querySelectMaker(columns)
 
 	rows, err := _db.Query(query, parent.Params...)
@@ -105,10 +107,9 @@ func (parent *PostgresDB) Get_(_db *sql.DB, columns []string) [][]any {
 
 }
 
-func (parent *PostgresDB) Save_(_db *sql.DB, columns []string, values []any, returningValues []string) []any {
+func (parent *PostgresDB) Save_(_db types.DBTX, columns []string, values []any, returningValues []string) []any {
 
 	table := parent.table
-	defer _db.Close()
 
 	var placeholders = make([]string, len(values))
 
@@ -139,9 +140,7 @@ func (parent *PostgresDB) Save_(_db *sql.DB, columns []string, values []any, ret
 
 // first
 
-func (parent *PostgresDB) First_(_db *sql.DB, columns []string) []any {
-
-	defer _db.Close()
+func (parent *PostgresDB) First_(_db types.DBTX, columns []string) []any {
 
 	// Run SELECT query
 	var query = parent.querySelectMaker(columns)
@@ -171,7 +170,7 @@ func (parent *PostgresDB) First_(_db *sql.DB, columns []string) []any {
 }
 
 // Update
-func (parent *PostgresDB) Update_(_db *sql.DB, columns []string, values []any) {
+func (parent *PostgresDB) Update_(_db types.DBTX, columns []string, values []any) {
 
 	table := parent.table
 	var placeholders = make([]string, len(values))
@@ -183,7 +182,6 @@ func (parent *PostgresDB) Update_(_db *sql.DB, columns []string, values []any) {
 
 	query := fmt.Sprintf("UPDATE %s SET %s ",
 		table, strings.Join(placeholders, ", "))
-	defer _db.Close()
 
 	// Combine the values
 	var accumaltedValues = append(parent.Params, values...)
@@ -196,9 +194,8 @@ func (parent *PostgresDB) Update_(_db *sql.DB, columns []string, values []any) {
 }
 
 // Delete
-func (parent *PostgresDB) Delete_(_db *sql.DB, id any) error {
+func (parent *PostgresDB) Delete_(_db types.DBTX, id any) error {
 
-	defer _db.Close()
 	if id != nil {
 		parent.Where_("id", []any{id}) // Add the ID
 	}
@@ -231,6 +228,10 @@ func (parent *PostgresDB) querySelectMaker(columns []string) string {
 
 	if parent.withOffSet {
 		query += " OFFSET " + strconv.Itoa(parent.offSet)
+	}
+
+	if parent.lockClause != "" {
+		query += " " + parent.lockClause
 	}
 
 	return query
@@ -331,6 +332,14 @@ func (parent *PostgresDB) OrderBy_(column string) {
 	parent.shouldOrderBy = true
 	parent.orderBy = append(parent.orderBy, column+" ASC")
 
+}
+
+func (parent *PostgresDB) LockForUpdate_() {
+	parent.lockClause = "FOR UPDATE"
+}
+
+func (parent *PostgresDB) SharedLock_() {
+	parent.lockClause = "FOR SHARE"
 }
 
 func (parent *PostgresDB) Limit_(max int) {
