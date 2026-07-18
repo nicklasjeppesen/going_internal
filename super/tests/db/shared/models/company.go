@@ -1,6 +1,8 @@
 package models
 
 import (
+	"context"
+
 	. "github.com/nicklasjeppesen/going_internal/super/db"
 	drivers "github.com/nicklasjeppesen/going_internal/super/db/drivers"
 	. "github.com/nicklasjeppesen/going_internal/super/db/types"
@@ -12,22 +14,12 @@ type Company struct {
 	Users []*User
 }
 
-func (c Company) DB() *Company {
-
+func (c Company) DB(ctx context.Context) *Company {
 	company := &Company{}
 	company.Table = "companies"
 	company.Columns = Columns{
-		// Column		  "values"
 		"name": &company.Name,
 	}
-	company.ParentDB = CreateORMWithCustomDB(company, DBCreator{Driver: drivers.CreateSQLite().Driver, ConnectionString: "./testdb.db"})
+	company.ParentDB = CreateORMWithCustomDB(ctx, company, DBCreator{Driver: drivers.CreateSQLite(ctx).Driver, ConnectionString: "./testdb.db"})
 	return company
-}
-
-// ------------ Relationships ----------------------//
-func (company *Company) Relations() IRelationships {
-
-	return company.CreateRelationShip(IRelationships{
-		//"users": HasMany(new(User).DB(), &company.Users),
-	})
 }
