@@ -74,6 +74,14 @@ func (response *Response) With(data map[string]string) *Response {
 	return response
 }
 
+func (response *Response) ErrorMessage() map[string][]string {
+	return response.errorMessage
+}
+
+func (response *Response) FlashData() map[string]string {
+	return response.flashData
+}
+
 // Print a struct to Json
 //
 // if struct field has hidden:true tag, it will be ignored.
