@@ -12,6 +12,7 @@ type HasManyRelation[T IDB[T]] struct {
 	relation        ISystemFields
 	relationToEntiy IRepository
 	callerMeethod   string
+	QueryModifiers[T, *HasManyRelation[T]]
 }
 
 func (belong *HasManyRelation[T]) Attach(data IRepository) error {
@@ -60,7 +61,11 @@ func (belong *HasManyRelation[T]) Load() {
 	if localKeyValue == nil {
 		return
 	}
-	response := belong.Holder.Where(belong.foreignKey, localKeyValue).Get()
+
+	query := belong.Holder.Where(belong.foreignKey, localKeyValue)
+	query = belong.Apply(query)
+	response := query.Get()
+
 	belong.relationToEntiy.SetRelationshipHolder(belong.callerMeethod, response)
 }
 
@@ -89,7 +94,10 @@ func (belong *HasManyRelation[T]) LoadMany(parents []ISystemFields, relationkey 
 	}
 
 	var resultsSet = map[any]collections.Collection[T]{}
-	var relationships = belong.Holder.WhereIn(belong.foreignKey, localIds).Get() // users
+	query := belong.Holder.WhereIn(belong.foreignKey, localIds)
+	query = belong.Apply(query)
+	var relationships = query.Get()
+
 	for _, user := range relationships {
 		var relation_id, _ = user.Value(belong.foreignKey) // User primary id
 		if relation_id == nil {
@@ -120,5 +128,6 @@ func NewHasMany[T IDB[T]](holder T, relationToEntiy IRepository) *HasManyRelatio
 		callerMeethod:   CallerMethodName(),
 	}
 	hasMany.setparent(relationToEntiy)
+	hasMany.newQueryModifiers(hasMany)
 	return hasMany
 }

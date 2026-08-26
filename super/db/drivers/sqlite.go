@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/nicklasjeppesen/going_internal/super/constants"
 	types "github.com/nicklasjeppesen/going_internal/super/db/types"
@@ -31,6 +32,7 @@ type SQLite struct {
 	orderBy       []string // What column shall be order
 	offSet        int
 	withOffSet    bool
+	lockClause    string
 	ctx           context.Context
 }
 
@@ -56,6 +58,7 @@ func (parent *SQLite) Clone() types.IDrivers {
 func (parent *SQLite) Open(connectionString string) *sql.DB {
 
 	_db, err := sql.Open("sqlite3", connectionString)
+	_db.SetConnMaxIdleTime(10 * time.Minute)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -64,9 +67,8 @@ func (parent *SQLite) Open(connectionString string) *sql.DB {
 
 // Actions
 
-func (parent *SQLite) Get_(_db *sql.DB, columns []string) [][]any {
+func (parent *SQLite) Get_(_db types.DBTX, columns []string) [][]any {
 
-	defer _db.Close()
 	var query = parent.querySelectMaker(columns)
 
 	rows, err := _db.QueryContext(parent.ctx, query, parent.Params...)
@@ -102,9 +104,7 @@ func (parent *SQLite) Get_(_db *sql.DB, columns []string) [][]any {
 
 }
 
-func (parent *SQLite) Save_(_db *sql.DB, columns []string, values []any, returningValues []string) []any {
-
-	defer _db.Close()
+func (parent *SQLite) Save_(_db types.DBTX, columns []string, values []any, returningValues []string) []any {
 
 	var placeholders = make([]string, len(values))
 	for i := range values {
@@ -151,9 +151,7 @@ func returning(returningValues []string) string {
 
 // first
 
-func (parent *SQLite) First_(_db *sql.DB, columns []string) []any {
-
-	defer _db.Close()
+func (parent *SQLite) First_(_db types.DBTX, columns []string) []any {
 
 	// Run SELECT query
 	var query = parent.querySelectMaker(columns)
@@ -185,7 +183,7 @@ func (parent *SQLite) First_(_db *sql.DB, columns []string) []any {
 }
 
 // Update
-func (parent *SQLite) Update_(_db *sql.DB, columns []string, values []any) {
+func (parent *SQLite) Update_(_db types.DBTX, columns []string, values []any) {
 
 	table := parent.table
 	var placeholders = make([]string, len(values))
@@ -197,7 +195,6 @@ func (parent *SQLite) Update_(_db *sql.DB, columns []string, values []any) {
 
 	query := fmt.Sprintf("UPDATE %s SET %s ",
 		table, strings.Join(placeholders, ", "))
-	defer _db.Close()
 
 	// Combine the values
 	var accumaltedValues = append(parent.Params, values...)
@@ -210,9 +207,8 @@ func (parent *SQLite) Update_(_db *sql.DB, columns []string, values []any) {
 }
 
 // Delete
-func (parent *SQLite) Delete_(_db *sql.DB, id any) error {
+func (parent *SQLite) Delete_(_db types.DBTX, id any) error {
 
-	defer _db.Close()
 	if id != nil {
 		parent.Where_("id", []any{id}) // Add the ID
 	}
@@ -246,6 +242,10 @@ func (parent *SQLite) querySelectMaker(columns []string) string {
 
 	if parent.withOffSet {
 		query += " OFFSET " + strconv.Itoa(parent.offSet)
+	}
+
+	if parent.lockClause != "" {
+		query += " " + parent.lockClause
 	}
 
 	return query
@@ -346,6 +346,14 @@ func (parent *SQLite) OrderBy_(column string) {
 	parent.shouldOrderBy = true
 	parent.orderBy = append(parent.orderBy, column+" ASC")
 
+}
+
+func (parent *SQLite) LockForUpdate_() {
+	log.Println("WARNING: LockForUpdate() is not supported by SQLite and has no effect.")
+}
+
+func (parent *SQLite) SharedLock_() {
+	log.Println("WARNING: SharedLock() is not supported by SQLite and has no effect.")
 }
 
 func (parent *SQLite) Limit_(max int) {

@@ -123,7 +123,6 @@ func (e *Engine) RenderTemplate(name string, data any) (template.HTML, error) {
 
 func (e *Engine) RenderOld(key string, data map[string]any) any {
 	if val, exists := data[constants.Old]; exists {
-		fmt.Println("Old exists")
 		if oldMap, ok := val.(map[string]any); ok {
 			if oldVal, found := oldMap[key]; found {
 				return oldVal
