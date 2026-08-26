@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"time"
 
+	relations "github.com/nicklasjeppesen/going_internal/super/db/relationship"
 	. "github.com/nicklasjeppesen/going_internal/super/collections"
 	"github.com/nicklasjeppesen/going_internal/super/customrouter/routeHelper"
 	drivers "github.com/nicklasjeppesen/going_internal/super/db/drivers"
@@ -22,6 +23,52 @@ type ActiveRecord[T IDB[T]] struct {
 	*ParentDB[T]
 	SystemFields
 }
+
+func (activerecord *ActiveRecord[T]) BelongsTo[U IDBConnection[U]](relationFrom U) *relations.BelongsTo[U] {
+	return relations.NewBelongsTo(relationFrom, activerecord)
+}
+
+func (activerecord *ActiveRecord[T]) BelongsToMany[U IDBConnection[U]](relationFrom U) *relations.BelongsToManyRelation[U] {
+	return relations.NewBelongsToMany(relationFrom, activerecord)
+}
+
+func (activerecord *ActiveRecord[T]) HasOne[U IDBConnection[U]](relationFrom U) *relations.HasOneRelation[U] {
+	return relations.NewHasOne(relationFrom, activerecord)
+}
+
+func (activerecord *ActiveRecord[T]) HasMany[U IDBConnection[U]](relationFrom U) *relations.HasManyRelation[U] {
+	return relations.NewHasMany(relationFrom, activerecord)
+}
+
+func (activerecord *ActiveRecord[T]) HasManyMorph[U IDBConnection[U]](relationFrom U) *relations.HasManyMorphRelation[U] {
+	return relations.NewHasManyMorph(relationFrom, activerecord)
+}
+
+
+func (activerecord *ActiveRecord[T]) BelongsToMorph[U IRepository](relatedModels []U, delegateAble string) *relations.BelongsToMorphRelation[U] {
+	return relations.NewBelongsToMorph(delegateAble, relatedModels, activerecord)
+}
+
+func (activerecord *ActiveRecord[T]) ToJson() map[string]any {
+
+	IgnoreStructs := []string{"Creator"}
+	flattenStructs := []string{"ActiveRecord", "ParentDB", "SystemFields"}
+
+	// We need this, because dbChild is private in this scope
+	v := reflect.ValueOf(*activerecord.ParentDB.dbChild)
+	t := reflect.ValueOf(activerecord.SystemFields)
+
+	relations := activerecord.SystemFields.RelationsToJson()
+
+	child := struct_to_map.Struct_to_map(v, IgnoreStructs, flattenStructs, nil)
+	systemFields := struct_to_map.Struct_to_map(t, nil, nil, nil)
+	maps.Copy(systemFields, child)
+	maps.Copy(systemFields, relations)
+	return systemFields
+
+}
+
+
 
 type ParentDB[T IDB[T]] struct {
 	creator  DBCreator
@@ -44,24 +91,7 @@ func (parent *ParentDB[T]) GetDriver() IDrivers {
 	return parent.creator.Driver
 }
 
-func (parent *ActiveRecord[T]) ToJson() map[string]any {
 
-	IgnoreStructs := []string{"Creator"}
-	flattenStructs := []string{"ActiveRecord", "ParentDB", "SystemFields"}
-
-	// We need this, because dbChild is private in this scope
-	v := reflect.ValueOf(*parent.ParentDB.dbChild)
-	t := reflect.ValueOf(parent.SystemFields)
-
-	relations := parent.SystemFields.RelationsToJson()
-
-	child := struct_to_map.Struct_to_map(v, IgnoreStructs, flattenStructs, nil)
-	systemFields := struct_to_map.Struct_to_map(t, nil, nil, nil)
-	maps.Copy(systemFields, child)
-	maps.Copy(systemFields, relations)
-	return systemFields
-
-}
 
 func (parent *ParentDB[T]) GetWith() []string {
 	return parent.with
