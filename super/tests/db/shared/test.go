@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -52,15 +53,15 @@ func (db *TestDB) GetConnectionString() string {
 }
 
 func NewInMemoryDB() (*TestDB, error) {
-	//connectionString := ":memory:"
 	connectionString := "./testdb.db"
+
+	os.Remove(connectionString)
 
 	db, err := sql.Open("sqlite3", connectionString)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check the connection is working properly
 	if err := db.Ping(); err != nil {
 		return nil, err
 	}

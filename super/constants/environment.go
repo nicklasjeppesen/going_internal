@@ -1,6 +1,7 @@
 package constants
 
 const App_env = "APP_ENV"
+const APP_Debug = "APP_DEBUG"
 const APP_Key = "APP_KEY"
 const APP_URL = "APP_URL"
 const APP_PORT = "APP_PORT"

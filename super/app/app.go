@@ -7,9 +7,12 @@ package app
 import (
 	"context"
 	"embed"
+	"fmt"
 	"log"
 
+	"github.com/go-playground/validator/v10"
 	Scheduler "github.com/nicklasjeppesen/going_internal/super/jobs"
+	"github.com/nicklasjeppesen/going_internal/super/validation"
 
 	"net/http"
 	"os"
@@ -47,6 +50,15 @@ func NewApp() *App {
 	app.LoadEnv()
 	app.UseTLS = true // Set to true to enable TLS, false for HTTP
 	return app
+}
+
+func (app App) RegisterCustomRules(rules map[string]func(fl validator.FieldLevel) bool) {
+	for tag, fn := range rules {
+		if err := validation.RegisterValidation(tag, fn); err != nil {
+			fmt.Errorf("failed to register validation rule %q: %w", tag, err)
+			panic(err)
+		}
+	}
 }
 
 // NewApp creates, configures, and returns a pointer to a new App instance.

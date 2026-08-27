@@ -2,15 +2,16 @@ package middleware
 
 import (
 	"net/http"
+	"github.com/nicklasjeppesen/going_internal/super/request"
 )
 
 // AuthMiddleware checks for a valid authentication token
-func {{.Model}}(next http.HandlerFunc) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func {{.Model}}(next request.Handler) request.Handler {
+	return func(req *request.Requestbase) {
 
 		// check for conditions
 
 		// Pass middleare, continue
-		next.ServeHTTP(w, r)
-	})
+		next(req)
+	}
 }

@@ -74,14 +74,25 @@ func (response *Response) With(data map[string]string) *Response {
 	return response
 }
 
+func (response *Response) ErrorMessage() map[string][]string {
+	return response.errorMessage
+}
+
+func (response *Response) FlashData() map[string]string {
+	return response.flashData
+}
+
 // Print a struct to Json
 //
 // if struct field has hidden:true tag, it will be ignored.
 // if the type is is a struct that has a the method: ToJson, this method
 // will be called by reflect before casting by Json.Marshal method
-func (c *Response) PrintJson(_v any) func(http.ResponseWriter, *http.Request) {
+func (c *Response) PrintJson(_v any, httpStatusCode ...int) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if len(httpStatusCode) > 0 {
+			w.WriteHeader(httpStatusCode[0])
+		}
 		output, _ := ToJSON(_v)
 		fmt.Fprintln(w, output)
 	}

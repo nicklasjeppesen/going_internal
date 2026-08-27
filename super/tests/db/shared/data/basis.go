@@ -13,3 +13,9 @@ var (
 		"name": "Company One"
 	}`)
 )
+
+var (
+	PostJSON = []byte(`{
+		"title": "First Post",
+		"user_id": 1}`)
+)

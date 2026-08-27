@@ -34,17 +34,13 @@ func (belong *BelongsTo[T]) ForeignKey(column string) *BelongsTo[T] {
 	return belong
 }
 
-/*
- * Asume a table follow the convension of id as primary key, if other key is used, then set it here
- */
+// Asume a table follow the convension of id as primary key, if other key is used, then set it here
 func (belong *BelongsTo[T]) LocalKey(column string) *BelongsTo[T] {
 	belong.localKey = column
 	return belong
 }
 
-/*
-* Set the The foreign key based on the table name
- */
+// Set the The foreign key based on the table name
 func (belong *BelongsTo[T]) setparent(relation ISystemFields) {
 	if belong.foreignKey != "" {
 		return

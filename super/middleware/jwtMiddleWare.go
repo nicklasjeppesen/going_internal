@@ -4,6 +4,7 @@ import (
 	"context"
 
 	constants "github.com/nicklasjeppesen/going_internal/super/constants"
+	"github.com/nicklasjeppesen/going_internal/super/request"
 
 	//. "github.com/nicklasjeppesen/going_internal/internal/super/inertiajs"
 	"net/http"
@@ -11,11 +12,11 @@ import (
 	security "github.com/nicklasjeppesen/going_internal/super/security"
 )
 
-func JWTMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(constants.Auth_token)
+func JWTMiddleware(next request.Handler) request.Handler {
+	return func(req *request.Requestbase) {
+		cookie, err := req.R.Cookie(constants.Auth_token)
 
-		referer := r.Referer()
+		referer := req.R.Referer()
 		if referer == "" {
 			referer = "/"
 		}
@@ -23,7 +24,7 @@ func JWTMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		// Check if cookie for login token exists
 		if err != nil || cookie.Value == "" {
 
-			http.Redirect(w, r, referer, http.StatusSeeOther)
+			http.Redirect(req.W, req.R, referer, http.StatusSeeOther)
 			return
 		}
 
@@ -32,14 +33,13 @@ func JWTMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		token, claim, err := svc.Verify(cookie.Value)
 
 		if err != nil || !token.Valid {
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
-			http.Redirect(w, r, referer, http.StatusMovedPermanently)
+			http.Error(req.W, "Invalid token", http.StatusUnauthorized)
+			http.Redirect(req.W, req.R, referer, http.StatusMovedPermanently)
 			return
 		}
 
 		authId := claim.Subject
-		ctx := context.WithValue(r.Context(), constants.Auth_id, authId)
-
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+		ctx := context.WithValue(req.R.Context(), constants.Auth_id, authId)
+		next(req.Withcontext(ctx))
+	}
 }

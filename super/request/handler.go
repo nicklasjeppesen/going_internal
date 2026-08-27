@@ -1,7 +1,6 @@
 package request
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,8 +11,9 @@ import (
 )
 
 // Cache only the reflect.Type slices, NOT reflect.Value
-var typeCache sync.Map // thread safe map[string][]reflect.Type
+//var typeCache sync.Map // thread safe map[string][]reflect.Type
 
+/*
 func getParamTypes(fnValue reflect.Value) []reflect.Type {
 
 	fnKey := fnValue.Pointer() // More stable than .String()
@@ -32,25 +32,168 @@ func getParamTypes(fnValue reflect.Value) []reflect.Type {
 		typeCache.Store(fnKey, paramTypes)
 	}
 	return paramTypes
+}*/
+
+type ArgHandler func(w http.ResponseWriter, r *http.Request, argStrings []string, argIndex *int) (reflect.Value, error)
+
+type structMeta struct {
+	bodyFieldType reflect.Type
+	bodyIsPointer bool
+	requiredTags  []string // pre-parsed json tags til validering
 }
 
-/**
- *
- * Tanke: Lav en list som kan holde alle metodetyper: []interface{}
- * Dvs. lav en metode som kan håndtere structs, int, string, bool, og parse them.
- * alle metoder skal returnere val err, til err håndtering,
- * Dermed hvis det er i cache, kan man loop igennem alle parameter index 1 gang, og smide dem ind i
- * i den liste af function som passer til dem, så slipper man for foreach, case osv.
- * dvs. en dic bestående key:string = functionsnavn, value: []interface{} - liste af functioner, til at håndtere,
- * input parameter.
- * Svært, da værdier parameter kommer fra: body, param.
- * UDFØRELSE:
- * først hentes de cachede type værdier det er en liste.
- * OG SÅ SKAL DER LAVES EN SAMLET ARGLISTE I RÆKKEFØLGE: JsonData, FIBER.CTX, ...PARAMS
- * SÅ loppes der igennem alle typer, og for param, sættes en index, og en handler
- * således, at næste gang, der loppes igennem typer, så kalder paramtyper index i ARGLISTEN, får værdien og sætter ind I sin gemte handler.
- */
+var planCache sync.Map       // map[uintptr][]ArgHandler
+var structMetaCache sync.Map // map[reflect.Type]*structMeta
 
+func getCallPlan(fnValue reflect.Value) []ArgHandler {
+	fnKey := fnValue.Pointer()
+
+	if cached, ok := planCache.Load(fnKey); ok {
+		return cached.([]ArgHandler)
+	}
+
+	fnType := fnValue.Type()
+	plan := make([]ArgHandler, 0, fnType.NumIn())
+
+	for i := 0; i < fnType.NumIn(); i++ {
+		paramType := fnType.In(i)
+		plan = append(plan, buildHandler(paramType))
+	}
+
+	planCache.Store(fnKey, plan)
+	return plan
+}
+
+func buildHandler(paramType reflect.Type) ArgHandler {
+	switch {
+	case paramType.Name() == "ResponseWriter":
+		return func(w http.ResponseWriter, r *http.Request, _ []string, _ *int) (reflect.Value, error) {
+			return reflect.ValueOf(w), nil
+		}
+
+	case paramType == reflect.TypeOf((*http.Request)(nil)):
+		return func(_ http.ResponseWriter, r *http.Request, _ []string, _ *int) (reflect.Value, error) {
+			return reflect.ValueOf(r), nil
+		}
+
+	case strings.HasPrefix(paramType.Name(), "RequestBodybase["):
+		meta := getStructMeta(paramType) // cachet metadata
+		return func(w http.ResponseWriter, r *http.Request, _ []string, _ *int) (reflect.Value, error) {
+			return handleRequestBodyWithMeta(w, r, paramType, meta)
+		}
+
+	case strings.HasPrefix(paramType.Name(), "Requestbase"):
+		return func(w http.ResponseWriter, r *http.Request, _ []string, _ *int) (reflect.Value, error) {
+			_, v := handleRequest(w, r, paramType)
+			return v, nil
+		}
+
+	case paramType.Kind() == reflect.Int:
+		return func(_ http.ResponseWriter, _ *http.Request, argStrings []string, argIndex *int) (reflect.Value, error) {
+			if *argIndex >= len(argStrings) {
+				return reflect.Value{}, fmt.Errorf("missing parameter")
+			}
+			v, err := strconv.Atoi(argStrings[*argIndex])
+			*argIndex++
+			if err != nil {
+				return reflect.Value{}, fmt.Errorf("invalid integer parameter")
+			}
+			return reflect.ValueOf(v), nil
+		}
+
+	case paramType.Kind() == reflect.String:
+		return func(_ http.ResponseWriter, _ *http.Request, argStrings []string, argIndex *int) (reflect.Value, error) {
+			if *argIndex >= len(argStrings) {
+				return reflect.Value{}, fmt.Errorf("missing parameter")
+			}
+			v := argStrings[*argIndex]
+			*argIndex++
+			return reflect.ValueOf(v), nil
+		}
+	}
+
+	// fallback for evt. andre structs
+	return func(w http.ResponseWriter, r *http.Request, _ []string, _ *int) (reflect.Value, error) {
+		_, v := handleStructValue(w, r, paramType)
+		return v, nil
+	}
+}
+
+func handleRequestBodyWithMeta(w http.ResponseWriter, r *http.Request, requestBodyStruct reflect.Type, meta *structMeta) (reflect.Value, error) {
+
+	// Create a new instance of the ORM struct (this part CANNOT be cached, see caveat)
+	elemType := meta.bodyFieldType
+	if meta.bodyIsPointer {
+		elemType = elemType.Elem()
+	}
+	ormStruct := reflect.New(elemType)
+
+	// Parse body ind i den nye struct
+	if err := parseDataToOrm(r, ormStruct.Interface()); err != nil {
+		return reflect.Value{}, err
+	}
+
+	// Build the requestBody Wrapper
+	requestBody := reflect.New(requestBodyStruct).Elem()
+	requestBody.Field(0).Set(reflect.ValueOf(Requestbase{w, r}))
+
+	if meta.bodyIsPointer {
+		requestBody.Field(1).Set(ormStruct)
+	} else {
+		requestBody.Field(1).Set(ormStruct.Elem())
+	}
+
+	return requestBody, nil
+}
+
+func CallUnknownFunc(fn interface{}, argStrings []string, w http.ResponseWriter, r *http.Request) {
+	fnValue := reflect.ValueOf(fn)
+	plan := getCallPlan(fnValue)
+
+	args := make([]reflect.Value, 0, len(plan))
+	argIndex := 0
+
+	for _, handler := range plan {
+		v, err := handler(w, r, argStrings, &argIndex)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		args = append(args, v)
+	}
+
+	returnValues := fnValue.Call(args)
+	handleReturnValues(returnValues, w, r)
+}
+
+func getStructMeta(t reflect.Type) *structMeta {
+	if cached, ok := structMetaCache.Load(t); ok {
+		return cached.(*structMeta)
+	}
+
+	field, _ := t.FieldByName("Body")
+	bodyType := field.Type
+	isPtr := bodyType.Kind() == reflect.Ptr
+
+	elemType := bodyType
+	if isPtr {
+		elemType = bodyType.Elem()
+	}
+
+	tags := make([]string, 0, elemType.NumField())
+	for i := 0; i < elemType.NumField(); i++ {
+		tag := strings.Split(elemType.Field(i).Tag.Get("json"), ",")[0]
+		if tag != "" && tag != "-" {
+			tags = append(tags, tag)
+		}
+	}
+
+	meta := &structMeta{bodyFieldType: bodyType, bodyIsPointer: isPtr, requiredTags: tags}
+	structMetaCache.Store(t, meta)
+	return meta
+}
+
+/*
 func CallUnknownFunc(fn interface{}, argStrings []string, w http.ResponseWriter, r *http.Request) {
 	fnValue := reflect.ValueOf(fn)
 	paramTypes := getParamTypes(fnValue)
@@ -105,7 +248,9 @@ func CallUnknownFunc(fn interface{}, argStrings []string, w http.ResponseWriter,
 	returnValues := fnValue.Call(args)
 	handleReturnValues(returnValues, w, r)
 }
+*/
 
+/*
 func parseArgument(arg string, t reflect.Type) (reflect.Value, error) {
 
 	switch t.Kind() {
@@ -127,6 +272,7 @@ func parseArgument(arg string, t reflect.Type) (reflect.Value, error) {
 		)
 	}
 }
+*/
 
 func handleStructValue(w http.ResponseWriter, r *http.Request, paramType reflect.Type) (error, reflect.Value) {
 	switch {
@@ -189,6 +335,7 @@ func createOrmStruct(ormStructReflect reflect.Type) (error, reflect.Value) {
 	return nil, ormStruct
 }
 
+/*
 func validateRequiredJSONFields(body []byte, t reflect.Type) error {
 	var keyMap map[string]json.RawMessage
 	if err := json.Unmarshal(body, &keyMap); err != nil {
@@ -210,7 +357,7 @@ func validateRequiredJSONFields(body []byte, t reflect.Type) error {
 	}
 
 	return nil
-}
+}*/
 
 func buildRequestBody(paramType reflect.Type, w http.ResponseWriter, r *http.Request, body reflect.Value) reflect.Value {
 	requestBody := reflect.New(paramType).Elem()

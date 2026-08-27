@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"time"
 
+	relations "github.com/nicklasjeppesen/going_internal/super/db/relationship"
 	. "github.com/nicklasjeppesen/going_internal/super/collections"
 	"github.com/nicklasjeppesen/going_internal/super/customrouter/routeHelper"
 	drivers "github.com/nicklasjeppesen/going_internal/super/db/drivers"
@@ -18,11 +19,56 @@ import (
 	struct_to_map "github.com/nicklasjeppesen/going_internal/super/util"
 )
 
-// Maybe a good idea?
 type ActiveRecord[T IDB[T]] struct {
 	*ParentDB[T]
 	SystemFields
 }
+
+func (activerecord *ActiveRecord[T]) BelongsTo[U IDBConnection[U]](relationFrom U) *relations.BelongsTo[U] {
+	return relations.NewBelongsTo(relationFrom, activerecord)
+}
+
+func (activerecord *ActiveRecord[T]) BelongsToMany[U IDBConnection[U]](relationFrom U) *relations.BelongsToManyRelation[U] {
+	return relations.NewBelongsToMany(relationFrom, activerecord)
+}
+
+func (activerecord *ActiveRecord[T]) HasOne[U IDBConnection[U]](relationFrom U) *relations.HasOneRelation[U] {
+	return relations.NewHasOne(relationFrom, activerecord)
+}
+
+func (activerecord *ActiveRecord[T]) HasMany[U IDBConnection[U]](relationFrom U) *relations.HasManyRelation[U] {
+	return relations.NewHasMany(relationFrom, activerecord)
+}
+
+func (activerecord *ActiveRecord[T]) HasManyMorph[U IDBConnection[U]](relationFrom U) *relations.HasManyMorphRelation[U] {
+	return relations.NewHasManyMorph(relationFrom, activerecord)
+}
+
+
+func (activerecord *ActiveRecord[T]) BelongsToMorph[U IRepository](relatedModels []U, delegateAble string) *relations.BelongsToMorphRelation[U] {
+	return relations.NewBelongsToMorph(delegateAble, relatedModels, activerecord)
+}
+
+func (activerecord *ActiveRecord[T]) ToJson() map[string]any {
+
+	IgnoreStructs := []string{"Creator"}
+	flattenStructs := []string{"ActiveRecord", "ParentDB", "SystemFields"}
+
+	// We need this, because dbChild is private in this scope
+	v := reflect.ValueOf(*activerecord.ParentDB.dbChild)
+	t := reflect.ValueOf(activerecord.SystemFields)
+
+	relations := activerecord.SystemFields.RelationsToJson()
+
+	child := struct_to_map.Struct_to_map(v, IgnoreStructs, flattenStructs, nil)
+	systemFields := struct_to_map.Struct_to_map(t, nil, nil, nil)
+	maps.Copy(systemFields, child)
+	maps.Copy(systemFields, relations)
+	return systemFields
+
+}
+
+
 
 type ParentDB[T IDB[T]] struct {
 	creator  DBCreator
@@ -30,7 +76,7 @@ type ParentDB[T IDB[T]] struct {
 	with     []string
 	route    string
 	callback Responsehandler
-	dbconn   *sql.DB
+	dbconn   DBTX
 	ctx      context.Context
 }
 
@@ -45,24 +91,7 @@ func (parent *ParentDB[T]) GetDriver() IDrivers {
 	return parent.creator.Driver
 }
 
-func (parent *ActiveRecord[T]) ToJson() map[string]any {
 
-	IgnoreStructs := []string{"Creator"}
-	flattenStructs := []string{"ActiveRecord", "ParentDB", "SystemFields"}
-
-	// We need this, because dbChild is private in this scope
-	v := reflect.ValueOf(*parent.ParentDB.dbChild)
-	t := reflect.ValueOf(parent.SystemFields)
-
-	relations := parent.SystemFields.RelationsToJson()
-
-	child := struct_to_map.Struct_to_map(v, IgnoreStructs, flattenStructs, nil)
-	systemFields := struct_to_map.Struct_to_map(t, nil, nil, nil)
-	maps.Copy(systemFields, child)
-	maps.Copy(systemFields, relations)
-	return systemFields
-
-}
 
 func (parent *ParentDB[T]) GetWith() []string {
 	return parent.with
@@ -110,7 +139,11 @@ func (parent *ParentDB[T]) addRoutes(data []T) []T {
 func (parent *ParentDB[T]) Select(query string) ([]map[string]any, error) {
 
 	var conn = parent.DbConn()
-	defer conn.Close()
+	defer func() {
+		if db, ok := conn.(*sql.DB); ok {
+			db.Close()
+		}
+	}()
 
 	rows, err := conn.Query(query)
 	if err != nil {
@@ -158,14 +191,14 @@ func (parent *ParentDB[T]) With(relation ...string) T {
 	return *parent.dbChild
 }
 
-func (parent *ParentDB[T]) DbConn() *sql.DB {
+func (parent *ParentDB[T]) DbConn() DBTX {
 	if parent.dbconn != nil {
 		return parent.dbconn
 	}
 	return parent.creator.Driver.Open(parent.creator.ConnectionString)
 }
 
-func (parent *ParentDB[T]) SetDbConn(conn *sql.DB) {
+func (parent *ParentDB[T]) SetDbConn(conn DBTX) {
 	parent.dbconn = conn
 }
 
@@ -174,11 +207,11 @@ func (parent *ParentDB[T]) Or(column string, value any) T {
 	return *parent.dbChild
 }
 
-/*
-* param: value can contain maximum 2 values
-* Ex. Where("id", 2) -> Where id = 2
-* Ex. Where("id", ">", 2) -> where id > 2
- */
+//	param: value can contain maximum 2 values
+//
+// Ex. Where("id", 2) -> Where id = 2
+//
+//	Ex. Where("id", ">", 2) -> where id > 2
 func (parent *ParentDB[T]) Where(column string, value ...any) T {
 	parent.creator.Driver.Where_(column, value)
 	return *parent.dbChild
@@ -214,13 +247,29 @@ func (parent *ParentDB[T]) OrderBy(column string) T {
 	return *parent.dbChild
 }
 
+func (parent *ParentDB[T]) LockForUpdate() T {
+	parent.creator.Driver.LockForUpdate_()
+	return *parent.dbChild
+}
+
+func (parent *ParentDB[T]) SharedLock() T {
+	parent.creator.Driver.SharedLock_()
+	return *parent.dbChild
+}
+
 func (parent *ParentDB[T]) SaveNonGenerics() (IRepository, error) {
 	return parent.Save()
 }
 
 func (parent *ParentDB[T]) Save() (T, error) {
 	var _db = parent.DbConn()
-	defer _db.Close()
+
+	defer func() {
+		if db, ok := _db.(*sql.DB); ok {
+			// close connection if not in a transaction
+			db.Close()
+		}
+	}()
 
 	var object = (*parent.dbChild)
 	var keys = object.GetKeys()
@@ -232,7 +281,7 @@ func (parent *ParentDB[T]) Save() (T, error) {
 
 	returningValues := object.ReturningValues()
 
-	var dbResult = parent.creator.Driver.Save_(parent.DbConn(), keys, values, returningValues)
+	var dbResult = parent.creator.Driver.Save_(_db, keys, values, returningValues)
 
 	for i, value := range returningValues {
 		object.SetValue(value, dbResult[i])
@@ -268,7 +317,13 @@ func (parent ParentDB[T]) GetNonGeneric() []IRepository {
  */
 func (parent *ParentDB[T]) First() T {
 	var _db = parent.DbConn()
-	defer _db.Close()
+
+	defer func() {
+		if db, ok := _db.(*sql.DB); ok {
+			// close connection if not in a transaction
+			db.Close()
+		}
+	}()
 
 	// Run SELECT query
 	var keys = (*parent.dbChild).GetKeys()
@@ -345,12 +400,19 @@ func (parent *ParentDB[T]) CheckingRelationForMany(childs []ISystemFields, relat
 
 func (parent *ParentDB[T]) Get() Collection[T] {
 
+	var _db = parent.DbConn()
+	defer func() {
+		if db, ok := _db.(*sql.DB); ok {
+			db.Close()
+		}
+	}()
+
 	child := (*parent.dbChild).DB(parent.ctx)
 	var keys = child.GetKeys()
 	var syskeys = child.Systemcolumns()
 	var accKeys = append(keys, syskeys...)
 
-	var allvalues = parent.creator.Driver.Get_(parent.DbConn(), accKeys)
+	var allvalues = parent.creator.Driver.Get_(_db, accKeys)
 	var mylist = []T{}
 	result := make([]ISystemFields, len(allvalues))
 
@@ -379,6 +441,12 @@ func (parent *ParentDB[T]) Update() error {
 
 	child := *parent.dbChild
 	var _db = parent.DbConn()
+	defer func() {
+		if db, ok := _db.(*sql.DB); ok {
+			db.Close()
+		}
+	}()
+
 	var customColumns = (*parent.dbChild).GetKeys() // custom columns
 	var values = []any{}                            // custom columns + updated_At
 
@@ -400,6 +468,12 @@ func (parent *ParentDB[T]) Delete() error {
 	child := *parent.dbChild
 	var primaryKey = child.PrimaryKey()
 	var _db = parent.DbConn()
+	defer func() {
+		if db, ok := _db.(*sql.DB); ok {
+			db.Close()
+		}
+	}()
+
 	var err = parent.creator.Driver.Delete_(_db, primaryKey)
 
 	if err != nil {
@@ -407,6 +481,51 @@ func (parent *ParentDB[T]) Delete() error {
 		return err
 	}
 	return nil
+}
+
+/*
+* Transaction begins a database transaction, executes the provided function,
+* and commits on success or rolls back on error/panic.
+* The *sql.Tx is passed to the callback so it can be used for raw SQL
+* or passed to other models via SetDbConn()/WithTx().
+* The parent model's connection is automatically set to the transaction.
+ */
+func (parent *ParentDB[T]) Transaction(fn func(tx *sql.Tx) error) error {
+	conn := parent.creator.Driver.Open(parent.creator.ConnectionString)
+	tx, err := conn.Begin()
+	if err != nil {
+		conn.Close()
+		return err
+	}
+
+	oldDbconn := parent.dbconn
+	parent.dbconn = tx
+
+	defer func() {
+		parent.dbconn = oldDbconn
+		conn.Close()
+	}()
+
+	defer func() {
+		if p := recover(); p != nil {
+			tx.Rollback()
+			panic(p)
+		}
+	}()
+
+	if err := fn(tx); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// WithTx sets a transaction on the model and returns it for chaining.
+// Use this inside a Transaction callback to attach the tx to other models.
+func (parent *ParentDB[T]) WithTx(tx *sql.Tx) T {
+	parent.dbconn = tx
+	return *parent.dbChild
 }
 
 func (parent *ParentDB[T]) Pagination(r *http.Request, perPage int) map[string]any {
