@@ -32,7 +32,7 @@ type TemplateView struct {
 
 func (viewtemplate TemplateView) View(tmplView string, prop ...viewparam) func(http.ResponseWriter, *http.Request) {
 	if templates[viewtemplate.BaseView] == nil {
-		templates[viewtemplate.BaseView] = New().templates
+		templates[viewtemplate.BaseView] = New(viewtemplate.CustomViewFunctions).templates
 	}
 
 	baseView := viewtemplate.BaseView

@@ -7,7 +7,7 @@ import (
 	"io/fs"
 	"path/filepath"
 	"strings"
-
+"maps"
 	"github.com/nicklasjeppesen/going_internal/super/constants"
 )
 
@@ -16,13 +16,21 @@ type Engine struct {
 	funcs     template.FuncMap
 }
 
-func New() *Engine {
+func New(customFuncs ...template.FuncMap) *Engine {
 
 	engine := &Engine{
 		funcs: template.FuncMap{},
 	}
 
 	engine.registerCoreFunctions()
+
+
+// Register any custom view functions (e.g. from the app's View Helper)
+for _, m := range customFuncs {
+	maps.Copy(engine.funcs, m)
+}
+
+
 	engine.loadTemplates()
 
 	return engine
