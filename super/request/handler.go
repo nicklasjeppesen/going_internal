@@ -42,11 +42,16 @@ type structMeta struct {
 	requiredTags  []string // pre-parsed json tags til validering
 }
 
-var planCache sync.Map       // map[uintptr][]ArgHandler
+var planCache sync.Map       // map[reflect.Type][]ArgHandler
 var structMetaCache sync.Map // map[reflect.Type]*structMeta
 
 func getCallPlan(fnValue reflect.Value) []ArgHandler {
-	fnKey := fnValue.Pointer()
+	// Key by the function's full type (signature), not fnValue.Pointer().
+	// reflect.Value.Pointer() is not unique for method values created via
+	// MethodByName(...).Interface() — they all share the same trampoline code
+	// pointer, so caching by it leaks one action's arg-plan to every other
+	// action, causing "reflect: Call using X as type Y" panics.
+	fnKey := fnValue.Type()
 
 	if cached, ok := planCache.Load(fnKey); ok {
 		return cached.([]ArgHandler)
