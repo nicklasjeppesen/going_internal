@@ -73,7 +73,7 @@ func (app App) Start() {
 
 	// Serve static files from the "assets" directory
 	fs := http.FileServer(http.Dir("internal/resources/assets"))
-	app.Router.Handle("GET /assets/", http.StripPrefix("/assets/", fs))
+	app.Router.Handle("GET /assets/", http.StripPrefix("/assets/", withServiceWorkerAllowed(fs)))
 
 	// 2. Setup HTTP layer
 	server := &http.Server{
@@ -126,6 +126,20 @@ func (app App) LoadEnv() {
 
 func getPort() string {
 	return ":" + os.Getenv("APP_PORT")
+}
+
+// withServiceWorkerAllowed sets the Service-Worker-Allowed header to "/" so
+// service workers served from the assets tree can be registered with the root
+// scope, controlling the whole origin, instead of being limited to the scope
+// of the directory they live in.
+//
+// The header is only honoured by the browser when the response is requested as
+// a service worker script, so it is harmless for any other static asset.
+func withServiceWorkerAllowed(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Service-Worker-Allowed", "/")
+		next.ServeHTTP(w, r)
+	})
 }
 
 func GetURl() string {
