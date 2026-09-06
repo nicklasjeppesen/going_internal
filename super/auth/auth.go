@@ -91,7 +91,7 @@ func (auth *Auth) Attempt() bool {
 }
 
 func (auth Auth) Logout() {
-	user := new(IUser).DB(auth.R.Context()).Where("id", auth.GetUserId()).First()
+	user := new(IUser).DB(auth.R.Context()).Where("id", auth.UserIdAsString()).First()
 	if user.Any() {
 		user.SessionToken = ""
 		user.DB(auth.R.Context()).Update()
