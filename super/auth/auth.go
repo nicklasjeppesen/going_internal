@@ -9,6 +9,8 @@ import (
 	"github.com/nicklasjeppesen/going_internal/super/db/types"
 	. "github.com/nicklasjeppesen/going_internal/super/db/types"
 	"github.com/nicklasjeppesen/going_internal/super/security"
+	"strconv"
+	"errors"
 )
 
 type IUser struct {
@@ -30,7 +32,7 @@ func (_user IUser) DB(ctx context.Context) *IUser {
 	return user
 }
 
-// Types
+// Auth define a authentication stuct for going 
 type Auth struct {
 	Email     string
 	Password  string
@@ -41,13 +43,31 @@ type Auth struct {
 	Driver    types.DBCreator
 }
 
-func (auth *Auth) GetUserId() string {
+func (auth *Auth) UserIdAsString() string {
 	userId := auth.R.Context().Value(constants.Auth_id)
 	if userId == nil {
 		return ""
 	}
 	return userId.(string)
 }
+
+func (auth *Auth) ID() (int64, error) {
+
+	_userID := auth.UserIdAsString()
+	
+	if _userID == "" {
+		return 0, errors.New("user not found")
+	}
+
+	userID, err := strconv.ParseInt(_userID, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return userID, nil
+	
+}
+
+
 
 func (auth *Auth) Attempt() bool {
 	iUser := new(IUser).DB(auth.R.Context())
