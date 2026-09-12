@@ -75,6 +75,13 @@ func (belong *BelongsTo[T]) Load() {
 	belong.Holder.AddDBVal(keys, syskeys, values)
 
 	parent.SetRelationshipHolder(belong.callerMeethod, belong.Holder)
+
+	// Eager-load nested relations requested on the holder (e.g. .WithUser())
+	if values != nil {
+		for _, relation := range belong.Holder.GetWith() {
+			LoadSingle(belong.Holder, relation)
+		}
+	}
 }
 
 // Strategi: vi går tilbage til det som var før, men, her laver jeg en liste og et map af localids,
@@ -114,6 +121,12 @@ func (belong *BelongsTo[T]) LoadMany(parents []ISystemFields, relationkey string
 
 		temp := belong.Holder.CopySelf()
 		temp.AddDBVal(keys, syskeys, values[i])
+
+		// Eager-load nested relations requested on the holder (e.g. .WithUser())
+		for _, relation := range belong.Holder.GetWith() {
+			LoadSingle(temp, relation)
+		}
+
 		relationships[i] = temp
 	}
 
