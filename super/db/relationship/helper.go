@@ -1,9 +1,47 @@
 package relationship
 
 import (
+	"reflect"
 	"runtime"
 	"strings"
+
+	. "github.com/nicklasjeppesen/going_internal/super/db/types"
 )
+
+// Loader is implemented by every relationship loader (BelongsTo, HasMany, etc.),
+// which can be resolved by name and eager-loaded.
+type Loader interface {
+	Load()
+	LoadMany(parents []ISystemFields, relationkey string)
+}
+
+// LoadSingle resolves the relation method with the given name on a single
+// parent and eager-loads it via Load().
+func LoadSingle(child any, relationkey string) {
+	if loader := relationLoader(child, relationkey); loader != nil {
+		loader.Load()
+	}
+}
+
+func relationLoader(child any, relationkey string) Loader {
+	v := reflect.ValueOf(child)
+	if !v.IsValid() {
+		return nil
+	}
+	method := v.MethodByName(relationkey)
+	if !method.IsValid() {
+		return nil
+	}
+	results := method.Call(nil)
+	if len(results) == 0 {
+		return nil
+	}
+	loader, ok := results[0].Interface().(Loader)
+	if !ok {
+		return nil
+	}
+	return loader
+}
 
 func removeTrailingS(input string) string {
 	// queries -> query

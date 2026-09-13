@@ -39,9 +39,9 @@ func (hub *BaseHub) HasThisURL(urlCheck string) bool {
 }
 
 /*
-  - Function to handle when connection to client is closed
-  - Left empty on purpose, because it should be the programmer
-    Who handle what should be done.
+  CancleConnecetion handle when connection to client is closed
+  Left empty on purpose, because it should be the programmer
+  Who handle what should be done.
 */
 func (hub *BaseHub) CancleConnecetion(*Client) {
 
@@ -54,7 +54,7 @@ func (hub *BaseHub) CancleConnecetion(*Client) {
 */
 func (hub *BaseHub) unregisterClient(client *Client) {
 	hub.Rooms.RemoveClientFromRooms(client)
-	delete(hub.Clients, client.Auth.GetUserId())
+	delete(hub.Clients, client.Auth.UserIdAsString())
 }
 
 /*
