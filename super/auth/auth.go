@@ -10,7 +10,6 @@ import (
 	. "github.com/nicklasjeppesen/going_internal/super/db/types"
 	"github.com/nicklasjeppesen/going_internal/super/security"
 	"strconv"
-	"errors"
 )
 
 type IUser struct {
@@ -51,19 +50,19 @@ func (auth *Auth) UserIdAsString() string {
 	return userId.(string)
 }
 
-func (auth *Auth) ID() (int64, error) {
+func (auth *Auth) ID() int64 {
 
 	_userID := auth.UserIdAsString()
 	
 	if _userID == "" {
-		return 0, errors.New("user not found")
+		return 0
 	}
 
 	userID, err := strconv.ParseInt(_userID, 10, 64)
 	if err != nil {
-		return 0, err
+		return 0
 	}
-	return userID, nil
+	return userID
 	
 }
 
