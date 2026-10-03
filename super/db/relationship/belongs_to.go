@@ -50,10 +50,11 @@ func (belong *BelongsTo[T]) setparent(relation ISystemFields) {
 }
 
 func (belong *BelongsTo[T]) Item() T {
-	if relation := belong.relationToEntiy.GetRelationshipHolder(belong.callerMeethod); relation != nil {
+	if relation := belong.relationToEntiy.GetRelationshipHolder(belong.callerMeethod); len(relation) > 0 {
 		return relation[0].(T)
 	}
 	return belong.Holder
+
 }
 
 func (belong *BelongsTo[T]) Load() {

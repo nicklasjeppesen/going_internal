@@ -44,11 +44,11 @@ type Auth struct {
 }
 
 func (auth *Auth) UserIdAsString() string {
-	userId := auth.R.Context().Value(constants.Auth_id)
-	if userId == nil {
+	userID := auth.R.Context().Value(constants.Auth_id)
+	if userID == nil {
 		return ""
 	}
-	return userId.(string)
+	return userID.(string)
 }
 
 func (auth *Auth) ID() (int64, error) {
