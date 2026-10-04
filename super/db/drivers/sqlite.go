@@ -3,14 +3,15 @@ package drivers
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/nicklasjeppesen/going_internal/super/constants"
 	types "github.com/nicklasjeppesen/going_internal/super/db/types"
@@ -55,14 +56,55 @@ func (parent *SQLite) Clone() types.IDrivers {
 	return &SQLite{ctx: parent.ctx}
 }
 
+// Open returns the shared connection pool for the database. Do not Close it.
 func (parent *SQLite) Open(connectionString string) *sql.DB {
+	return sharedPool("sqlite3", sqliteDSN(connectionString))
+}
 
-	_db, err := sql.Open("sqlite3", connectionString)
-	_db.SetConnMaxIdleTime(10 * time.Minute)
-	if err != nil {
-		log.Fatal(err)
+// sqliteDefaults are added to the connection string unless it sets them
+// itself (also under the driver's alias, e.g. _journal for _journal_mode):
+//   - WAL lets readers work while one writer writes, instead of failing with
+//     "database is locked" under concurrent requests (Rails 8 does the same).
+//     SQLite keeps -wal and -shm files next to the database in this mode.
+//   - busy_timeout makes a writer wait up to 5 seconds for the write lock.
+//   - txlock=immediate takes the write lock when a transaction begins, so two
+//     transactions can't deadlock while upgrading from reading to writing.
+var sqliteDefaults = []struct {
+	key, alias, value string
+}{
+	{"_journal_mode", "_journal", "WAL"},
+	{"_busy_timeout", "_timeout", "5000"},
+	{"_txlock", "", "immediate"},
+}
+
+// sqliteDSN adds sqliteDefaults to a connection string. In-memory databases
+// are left as they are.
+func sqliteDSN(connectionString string) string {
+	if connectionString == "" || strings.Contains(connectionString, ":memory:") || strings.Contains(connectionString, "mode=memory") {
+		return connectionString
 	}
-	return _db // remember to close DB when getting it.
+
+	var params url.Values
+	if i := strings.IndexByte(connectionString, '?'); i >= 0 {
+		params, _ = url.ParseQuery(connectionString[i+1:])
+	}
+
+	var add []string
+	for _, d := range sqliteDefaults {
+		if params.Has(d.key) || (d.alias != "" && params.Has(d.alias)) {
+			continue
+		}
+		add = append(add, d.key+"="+d.value)
+	}
+	if len(add) == 0 {
+		return connectionString
+	}
+
+	separator := "?"
+	if strings.Contains(connectionString, "?") {
+		separator = "&"
+	}
+	return connectionString + separator + strings.Join(add, "&")
 }
 
 // Actions
@@ -73,8 +115,8 @@ func (parent *SQLite) Get_(_db types.DBTX, columns []string) [][]any {
 
 	rows, err := _db.QueryContext(parent.ctx, query, parent.Params...)
 	if err != nil {
-		log.Fatal(err)
-		fmt.Println("Error getting rows")
+		log.Printf("SQLite query failed: %v (%s)", err, query)
+		return nil
 	}
 	defer rows.Close()
 
@@ -87,24 +129,24 @@ func (parent *SQLite) Get_(_db types.DBTX, columns []string) [][]any {
 			values[i] = new(any) // create addressable placeholder
 		}
 
-		err := rows.Scan(values[:]...)
-		if err != nil {
-			log.Fatal(err)
-			fmt.Println("Error getting rows2")
+		if err := rows.Scan(values[:]...); err != nil {
+			log.Printf("SQLite scan failed: %v (%s)", err, query)
+			return nil
 		}
 		mylist = append(mylist, values)
 	}
 
 	// Check for error during iteration
 	if err := rows.Err(); err != nil {
-		log.Fatal(err)
+		log.Printf("SQLite rows failed: %v (%s)", err, query)
+		return nil
 	}
 
 	return mylist
 
 }
 
-func (parent *SQLite) Save_(_db types.DBTX, columns []string, values []any, returningValues []string) []any {
+func (parent *SQLite) Save_(_db types.DBTX, columns []string, values []any, returningValues []string) ([]any, error) {
 
 	var placeholders = make([]string, len(values))
 	for i := range values {
@@ -121,11 +163,10 @@ func (parent *SQLite) Save_(_db types.DBTX, columns []string, values []any, retu
 
 	if len(returningValues) == 0 {
 		// Hvis ingen RETURNING, brug Exec i stedet for QueryRow
-		_, err := _db.ExecContext(parent.ctx, query, values...)
-		if err != nil {
-			log.Fatal(err)
+		if _, err := _db.ExecContext(parent.ctx, query, values...); err != nil {
+			return nil, fmt.Errorf("insert into %s: %w", parent.table, err)
 		}
-		return nil
+		return nil, nil
 	}
 
 	result := make([]any, len(returningValues))
@@ -134,11 +175,10 @@ func (parent *SQLite) Save_(_db types.DBTX, columns []string, values []any, retu
 		scanArgs[i] = &result[i]
 	}
 
-	err := _db.QueryRow(query, values...).Scan(scanArgs...)
-	if err != nil {
-		log.Fatal(err)
+	if err := _db.QueryRowContext(parent.ctx, query, values...).Scan(scanArgs...); err != nil {
+		return nil, fmt.Errorf("insert into %s: %w", parent.table, err)
 	}
-	return result
+	return result, nil
 
 }
 
@@ -167,10 +207,12 @@ func (parent *SQLite) First_(_db types.DBTX, columns []string) []any {
 	err := row.Scan(values[:]...)
 
 	if err != nil {
-		fmt.Println(err.Error())
-		// Meaning, no rows found
+		// No rows is a normal result (First returns the empty model); only
+		// log real errors.
+		if !errors.Is(err, sql.ErrNoRows) {
+			fmt.Println(err.Error())
+		}
 		return nil
-
 	}
 	// Check for error during iteration
 	if err := row.Err(); err != nil {
@@ -183,7 +225,7 @@ func (parent *SQLite) First_(_db types.DBTX, columns []string) []any {
 }
 
 // Update
-func (parent *SQLite) Update_(_db types.DBTX, columns []string, values []any) {
+func (parent *SQLite) Update_(_db types.DBTX, columns []string, values []any) error {
 
 	table := parent.table
 	var placeholders = make([]string, len(values))
@@ -200,10 +242,10 @@ func (parent *SQLite) Update_(_db types.DBTX, columns []string, values []any) {
 	var accumaltedValues = append(parent.Params, values...)
 
 	query = parent.queryUpdateMaker(query)
-	_, err := _db.Exec(query, accumaltedValues...)
-	if err != nil {
-		log.Fatal(err.Error())
+	if _, err := _db.ExecContext(parent.ctx, query, accumaltedValues...); err != nil {
+		return fmt.Errorf("update %s: %w", table, err)
 	}
+	return nil
 }
 
 // Delete
@@ -214,10 +256,8 @@ func (parent *SQLite) Delete_(_db types.DBTX, id any) error {
 	}
 	var query = parent.queryDeleteMaker()
 
-	_, err := _db.ExecContext(parent.ctx, query, parent.Params...)
-	if err != nil {
-		log.Fatal(err.Error())
-		return err
+	if _, err := _db.ExecContext(parent.ctx, query, parent.Params...); err != nil {
+		return fmt.Errorf("delete from %s: %w", parent.table, err)
 	}
 
 	return nil

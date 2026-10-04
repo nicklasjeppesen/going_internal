@@ -3,6 +3,7 @@ package drivers
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/nicklasjeppesen/going_internal/super/constants"
 	types "github.com/nicklasjeppesen/going_internal/super/db/types"
@@ -58,14 +58,9 @@ func (parent *PostgresDB) Clone() types.IDrivers {
 	return &PostgresDB{ctx: parent.ctx}
 }
 
+// Open returns the shared connection pool for the database. Do not Close it.
 func (parent *PostgresDB) Open(connectionString string) *sql.DB {
-
-	_db, err := sql.Open("postgres", connectionString)
-	_db.SetConnMaxIdleTime(10 * time.Minute)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return _db // remember to close DB when getting it.
+	return sharedPool("postgres", connectionString)
 }
 
 // Actions
@@ -74,10 +69,10 @@ func (parent *PostgresDB) Get_(_db types.DBTX, columns []string) [][]any {
 
 	var query = parent.querySelectMaker(columns)
 
-	rows, err := _db.Query(query, parent.Params...)
+	rows, err := _db.QueryContext(parent.ctx, query, parent.Params...)
 	if err != nil {
-		log.Fatal(err)
-		fmt.Println("Error getting rows")
+		log.Printf("Postgres query failed: %v (%s)", err, query)
+		return nil
 	}
 	defer rows.Close()
 
@@ -90,24 +85,24 @@ func (parent *PostgresDB) Get_(_db types.DBTX, columns []string) [][]any {
 			values[i] = new(any) // create addressable placeholder
 		}
 
-		err := rows.Scan(values[:]...)
-		if err != nil {
-			log.Fatal(err)
-			fmt.Println("Error getting rows")
+		if err := rows.Scan(values[:]...); err != nil {
+			log.Printf("Postgres scan failed: %v (%s)", err, query)
+			return nil
 		}
 		mylist = append(mylist, values)
 	}
 
 	// Check for error during iteration
 	if err := rows.Err(); err != nil {
-		log.Fatal(err)
+		log.Printf("Postgres rows failed: %v (%s)", err, query)
+		return nil
 	}
 
 	return mylist
 
 }
 
-func (parent *PostgresDB) Save_(_db types.DBTX, columns []string, values []any, returningValues []string) []any {
+func (parent *PostgresDB) Save_(_db types.DBTX, columns []string, values []any, returningValues []string) ([]any, error) {
 
 	table := parent.table
 
@@ -117,8 +112,15 @@ func (parent *PostgresDB) Save_(_db types.DBTX, columns []string, values []any, 
 		placeholders[index] = "$" + strconv.Itoa(index+1)
 	}
 
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s) "+strings.Join(returningValues, ", "),
-		table, strings.Join(columns, ", "), strings.Join(placeholders, ", "))
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s) %s",
+		table, strings.Join(columns, ", "), strings.Join(placeholders, ", "), returning(returningValues))
+
+	if len(returningValues) == 0 {
+		if _, err := _db.ExecContext(parent.ctx, query, values...); err != nil {
+			return nil, fmt.Errorf("insert into %s: %w", table, err)
+		}
+		return nil, nil
+	}
 
 	result := make([]any, len(returningValues))
 	scanArgs := make([]any, len(returningValues))
@@ -126,15 +128,10 @@ func (parent *PostgresDB) Save_(_db types.DBTX, columns []string, values []any, 
 		scanArgs[i] = &result[i]
 	}
 
-	err := _db.QueryRowContext(parent.ctx, query, values...).Scan(scanArgs...)
-	if err != nil {
-		log.Fatal(err)
+	if err := _db.QueryRowContext(parent.ctx, query, values...).Scan(scanArgs...); err != nil {
+		return nil, fmt.Errorf("insert into %s: %w", table, err)
 	}
-
-	if err != nil {
-		log.Fatal(err)
-	}
-	return result
+	return result, nil
 
 }
 
@@ -156,21 +153,23 @@ func (parent *PostgresDB) First_(_db types.DBTX, columns []string) []any {
 	err := row.Scan(values[:]...)
 
 	if err != nil {
-		fmt.Println(err)
+		// No rows is a normal result (First returns the empty model); only
+		// log real errors.
+		if !errors.Is(err, sql.ErrNoRows) {
+			fmt.Println(err)
+		}
 		return nil
-
 	}
 	// Check for error during iteration
 	if err := row.Err(); err != nil {
 		fmt.Println(err)
 		return nil
 	}
-	fmt.Println(values[0] == nil)
 	return values
 }
 
 // Update
-func (parent *PostgresDB) Update_(_db types.DBTX, columns []string, values []any) {
+func (parent *PostgresDB) Update_(_db types.DBTX, columns []string, values []any) error {
 
 	table := parent.table
 	var placeholders = make([]string, len(values))
@@ -187,10 +186,12 @@ func (parent *PostgresDB) Update_(_db types.DBTX, columns []string, values []any
 	var accumaltedValues = append(parent.Params, values...)
 
 	query = parent.queryUpdateMaker(query)
-	err := _db.QueryRowContext(parent.ctx, query, accumaltedValues...)
-	if err.Err() != nil {
-		log.Fatal(err.Err().Error())
+	// ExecContext, not QueryRowContext: a Row that is never scanned keeps its
+	// connection checked out of the pool forever.
+	if _, err := _db.ExecContext(parent.ctx, query, accumaltedValues...); err != nil {
+		return fmt.Errorf("update %s: %w", table, err)
 	}
+	return nil
 }
 
 // Delete
@@ -200,10 +201,8 @@ func (parent *PostgresDB) Delete_(_db types.DBTX, id any) error {
 		parent.Where_("id", []any{id}) // Add the ID
 	}
 	var query = parent.queryDeleteMaker()
-	err := _db.QueryRowContext(parent.ctx, query, parent.Params...)
-	if err.Err() != nil {
-		log.Fatal(err.Err().Error())
-		return err.Err()
+	if _, err := _db.ExecContext(parent.ctx, query, parent.Params...); err != nil {
+		return fmt.Errorf("delete from %s: %w", parent.table, err)
 	}
 
 	return nil
@@ -365,8 +364,7 @@ func (parent *PostgresDB) CreateMigrationTable() string {
 // TODO implement
 func (parent *PostgresDB) Migrate(scriptpath string) error {
 
-	db := parent.Open(parent.connectionString)
-	defer db.Close()
+	db := parent.Open(parent.connectionString) // shared pool – not closed
 
 	// Testing the connnection to the postgres DB
 	if err := db.Ping(); err != nil {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/sessions"
 	"github.com/nicklasjeppesen/going_internal/super/constants"
@@ -21,7 +22,46 @@ func (c *SampleController) RenderHome() Result {
 }
 */
 
-var templates = map[string]*template.Template{}
+// engines holds the parsed templates per base view. They are parsed lazily
+// on first use, which can happen from several requests at once, so the map is
+// guarded by enginesMu.
+var (
+	enginesMu sync.RWMutex
+	engines   = map[string]*Engine{}
+)
+
+// engineFor returns the template engine for the view's base view, parsing
+// the templates the first time.
+func engineFor(viewtemplate TemplateView) *Engine {
+	enginesMu.RLock()
+	engine := engines[viewtemplate.BaseView]
+	enginesMu.RUnlock()
+	if engine != nil {
+		return engine
+	}
+
+	enginesMu.Lock()
+	defer enginesMu.Unlock()
+	if engine = engines[viewtemplate.BaseView]; engine == nil {
+		engine = New(viewtemplate.CustomViewFunctions)
+		engines[viewtemplate.BaseView] = engine
+	}
+	return engine
+}
+
+// templatesFor returns the parsed templates for the view's base view.
+func templatesFor(viewtemplate TemplateView) *template.Template {
+	return engineFor(viewtemplate).templates
+}
+
+// templateError writes a template error page. In debug mode it also lists
+// the templates that failed to parse, which is usually why a view is missing.
+func templateError(w http.ResponseWriter, engine *Engine, message string) {
+	if util.GetEnv(constants.APP_Debug, "") == "true" {
+		message += engine.parseErrorDetails()
+	}
+	http.Error(w, message, http.StatusInternalServerError)
+}
 
 type viewparam = map[string]any
 
@@ -31,9 +71,8 @@ type TemplateView struct {
 }
 
 func (viewtemplate TemplateView) View(tmplView string, prop ...viewparam) func(http.ResponseWriter, *http.Request) {
-	if templates[viewtemplate.BaseView] == nil {
-		templates[viewtemplate.BaseView] = New(viewtemplate.CustomViewFunctions).templates
-	}
+	engine := engineFor(viewtemplate)
+	tmpl := engine.templates
 
 	baseView := viewtemplate.BaseView
 	if viewtemplate.BaseView == "" {
@@ -44,24 +83,23 @@ func (viewtemplate TemplateView) View(tmplView string, prop ...viewparam) func(h
 		data := getData(r, w, tmplView, prop...)
 
 		// 1. Check if the template/block even exists in the general map
-		tmpl := templates[viewtemplate.BaseView]
 		if tmpl == nil || tmpl.Lookup(baseView) == nil {
-			http.Error(w, "Template error: Could not find view '"+baseView+"'. Check for spelling eror in {{ define }}?", http.StatusInternalServerError)
+			templateError(w, engine, "Template error: Could not find view '"+baseView+"'. Check for spelling eror in {{ define }}?")
 			return
 		}
 
 		// 2. Check if the specific tmpView exists,
 		if tmpl.Lookup(tmplView) == nil {
-			http.Error(w, "Template error: Could not find view '"+tmplView+"'. Check for spelling eror in {{ define \""+tmplView+"\" }}", http.StatusInternalServerError)
+			templateError(w, engine, "Template error: Could not find view '"+tmplView+"'. Check for spelling eror in {{ define \""+tmplView+"\" }}")
 			return
 		}
 
 		var buf bytes.Buffer
 
-		if err := templates[viewtemplate.BaseView].ExecuteTemplate(&buf, baseView, data); err != nil {
+		if err := tmpl.ExecuteTemplate(&buf, baseView, data); err != nil {
 			// TODO: Place with proper error handling
 			fmt.Println("error", err.Error())
-			http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
+			templateError(w, engine, "Template error: "+err.Error())
 			return
 		}
 		buf.WriteTo(w)
@@ -75,39 +113,50 @@ func getData(r *http.Request, w http.ResponseWriter, tmplView string, prop ...vi
 		data = prop[0]
 	}
 
-	data = addErrors(data, w, r)
-	data = addOld(data, w, r)
-	data = addFlash(data, w, r)
+	// Errors, old input and flash messages live in the same session cookie:
+	// read it once, and save it once if any of them were consumed.
+	session, err := getSessionStore().Get(r, constants.Session_info)
+	if err != nil {
+		fmt.Println("Fejl ved hentning af session:", err)
+	}
+
+	consumed := addErrors(data, session)
+	consumed = addViewData(data, session, constants.Old) || consumed
+	consumed = addViewData(data, session, constants.Flash) || consumed
+
+	if consumed {
+		session.Options.Path = "/" // Sikrer samme sti
+		session.Save(r, w)
+	}
+
 	data[constants.Csrf_token] = r.Context().Value(constants.Csrf_token)
 	data["ContentView"] = tmplView
 	return data
 }
 
-func addFlash(propVal map[string]any, w http.ResponseWriter, r *http.Request) map[string]any {
-	return addViewData(propVal, w, r, constants.Flash)
+var (
+	sessionStoreOnce sync.Once
+	sessionStore     *sessions.CookieStore
+)
+
+// getSessionStore returns the cookie store for the session, created once
+// (the app key is loaded from .env before the first request).
+func getSessionStore() *sessions.CookieStore {
+	sessionStoreOnce.Do(func() {
+		sessionStore = sessions.NewCookieStore([]byte(util.GetEnv(constants.APP_Key, "")))
+	})
+	return sessionStore
 }
 
-func addOld(propVal map[string]any, w http.ResponseWriter, r *http.Request) map[string]any {
-	return addViewData(propVal, w, r, constants.Old)
-}
-
-// add errors infomation to the view data, if there is any in the session
-func addErrors(propVal map[string]any, w http.ResponseWriter, r *http.Request) map[string]any {
+// addErrors adds validation errors from the session to the view data. It
+// returns true if there were any, so they are removed from the session
+// (shown only once, like a flash message).
+func addErrors(propVal map[string]any, session *sessions.Session) bool {
 	var name = constants.Errors
-	var key = util.GetEnv(constants.APP_Key, "")
-	var store = sessions.NewCookieStore([]byte(key))
-
-	session, err := store.Get(r, constants.Session_info)
-	if err != nil {
-		fmt.Println("Fejl ved hentning af session:", err)
-	}
 
 	if messages, ok := session.Values[name].(string); ok {
-		var b2 = []byte(messages)
 		var m2 map[string][]string
-
-		err = json.Unmarshal(b2, &m2)
-		if err != nil {
+		if err := json.Unmarshal([]byte(messages), &m2); err != nil {
 			fmt.Println(err.Error())
 		}
 
@@ -117,32 +166,21 @@ func addErrors(propVal map[string]any, w http.ResponseWriter, r *http.Request) m
 
 		// Delete the message, so it will not be shown again, after next reload (flash-message)
 		delete(session.Values, name)
-		session.Options.Path = "/" // Sikrer samme sti
-		session.Save(r, w)
-	} else {
-		propVal[name] = map[string][]string{}
-		propVal["has"+name] = false
-
+		return true
 	}
-	return propVal
+
+	propVal[name] = map[string][]string{}
+	propVal["has"+name] = false
+	return false
 }
 
-// add errors infomation to the view data, if there is any in the session
-func addViewData(propVal map[string]any, w http.ResponseWriter, r *http.Request, name string) map[string]any {
-	var key = util.GetEnv(constants.APP_Key, "")
-	var store = sessions.NewCookieStore([]byte(key))
-
-	session, err := store.Get(r, constants.Session_info)
-	if err != nil {
-		fmt.Println("Fejl ved hentning af session:", err)
-	}
-
+// addViewData adds old input or flash messages (name) from the session to the
+// view data. It returns true if there were any, so they are removed from the
+// session.
+func addViewData(propVal map[string]any, session *sessions.Session, name string) bool {
 	if messages, ok := session.Values[name].(string); ok {
-		var b2 = []byte(messages)
 		var m2 map[string]any
-
-		err = json.Unmarshal(b2, &m2)
-		if err != nil {
+		if err := json.Unmarshal([]byte(messages), &m2); err != nil {
 			fmt.Println(err.Error())
 		}
 
@@ -152,12 +190,10 @@ func addViewData(propVal map[string]any, w http.ResponseWriter, r *http.Request,
 
 		// Delete the message, so it will not be shown again, after next reload (flash-message)
 		delete(session.Values, name)
-		session.Options.Path = "/" // Sikrer samme sti
-		session.Save(r, w)
-	} else {
-		propVal[name] = map[string]any{}
-		propVal["has"+name] = false
-
+		return true
 	}
-	return propVal
+
+	propVal[name] = map[string]any{}
+	propVal["has"+name] = false
+	return false
 }

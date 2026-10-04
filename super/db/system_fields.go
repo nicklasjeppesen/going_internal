@@ -69,15 +69,16 @@ func (dbsys *SystemFields) PrimaryKeyName() string {
 	return "id" // in feature, this could change
 }
 
+// checkValue finds the holder for one column: a custom column first, then a
+// system column. It builds only that one holder instead of the full maps.
 func (dbsys *SystemFields) checkValue(key string) (types.ValueHolder, error) {
-
-	if val, ok := dbsys.DBSetUp().ValueHolder[key]; ok {
-		return val, nil
-	} else if val, ok := dbsys.SystemMapper().ValueHolder[key]; ok {
-		return val, nil
-	} else {
-		return types.ValueHolder{}, errors.New("key does not exists")
+	if ptr, ok := dbsys.Columns[key]; ok {
+		return f(ptr), nil
 	}
+	if val, ok := dbsys.systemHolder(key); ok {
+		return val, nil
+	}
+	return types.ValueHolder{}, errors.New("key does not exists")
 }
 
 // look for a a given value first for system, then for Custom defined value
@@ -179,25 +180,40 @@ func (dbsys *SystemFields) GetKeys() []string {
 }
 
 // Data getter and setter for the default columns
+var systemKeys = []string{"id", "created_at", "updated_at", "pivots"}
+
 func (dbsys *SystemFields) SystemMapper() types.DBMapper {
-	var holder = map[string]types.ValueHolder{
-		"id": {Getter: func() any {
+	var holder = make(map[string]types.ValueHolder, len(systemKeys))
+	for _, key := range systemKeys {
+		holder[key], _ = dbsys.systemHolder(key)
+	}
+	return types.DBMapper{ValueHolder: holder}
+}
+
+// systemHolder returns the getter/setter for one system column.
+func (dbsys *SystemFields) systemHolder(key string) (types.ValueHolder, bool) {
+	switch key {
+	case "id":
+		return types.ValueHolder{Getter: func() any {
 			if IsDefaultGeneric(dbsys.Id) {
 				return nil
 			} else {
 				return dbsys.Id
 			}
-		}, Setter: func(val any) { dbsys.Id = val.(int64) }},
-		"created_at": {Getter: func() any { return dbsys.Created_at }, Setter: func(val any) { dbsys.Created_at = val.(time.Time) }},
-		"updated_at": {Getter: func() any { return dbsys.Updated_at }, Setter: func(val any) { dbsys.Updated_at = val.(time.Time) }},
-		"pivots": {Getter: func() any { return dbsys.Pivots }, SetterMap: func(key string, value any) {
+		}, Setter: func(val any) { dbsys.Id = val.(int64) }}, true
+	case "created_at":
+		return types.ValueHolder{Getter: func() any { return dbsys.Created_at }, Setter: func(val any) { dbsys.Created_at = val.(time.Time) }}, true
+	case "updated_at":
+		return types.ValueHolder{Getter: func() any { return dbsys.Updated_at }, Setter: func(val any) { dbsys.Updated_at = val.(time.Time) }}, true
+	case "pivots":
+		return types.ValueHolder{Getter: func() any { return dbsys.Pivots }, SetterMap: func(key string, value any) {
 			if dbsys.Pivots == nil {
 				dbsys.Pivots = map[string]any{}
 			}
 			dbsys.Pivots[key] = value
-		}},
+		}}, true
 	}
-	return types.DBMapper{ValueHolder: holder}
+	return types.ValueHolder{}, false
 }
 
 // Check if unknown type, is equal to its default value (kind of nil)
@@ -259,15 +275,18 @@ func (dbsys *SystemFields) AddDBVal(keys []string, syskeys []string, values []an
 	if len(values) == 0 {
 		return
 	}
+	// Build the mappers once per row, not once per column.
+	columns := dbsys.DBSetUp().ValueHolder
 	for index, key := range keys {
 		var value = *(values[index].(*any))
 		if value == nil {
 			continue
 		}
-		dbsys.DBSetUp().ValueHolder[key].Setter(value)
+		columns[key].Setter(value)
 	}
+	system := dbsys.SystemMapper().ValueHolder
 	for index, key := range syskeys {
-		dbsys.SystemMapper().ValueHolder[key].Setter(*(values[len(keys)+index].(*any)))
+		system[key].Setter(*(values[len(keys)+index].(*any)))
 	}
 }
 

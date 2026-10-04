@@ -5,15 +5,21 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"log"
+	"maps"
 	"path/filepath"
 	"strings"
-"maps"
+
 	"github.com/nicklasjeppesen/going_internal/super/constants"
 )
 
 type Engine struct {
 	templates *template.Template
 	funcs     template.FuncMap
+
+	// parseErrors holds the templates that could not be parsed (file and
+	// line), so a later "could not find view" can point at the real cause.
+	parseErrors []error
 }
 
 func New(customFuncs ...template.FuncMap) *Engine {
@@ -24,12 +30,10 @@ func New(customFuncs ...template.FuncMap) *Engine {
 
 	engine.registerCoreFunctions()
 
-
-// Register any custom view functions (e.g. from the app's View Helper)
-for _, m := range customFuncs {
-	maps.Copy(engine.funcs, m)
-}
-
+	// Register any custom view functions (e.g. from the app's View Helper)
+	for _, m := range customFuncs {
+		maps.Copy(engine.funcs, m)
+	}
 
 	engine.loadTemplates()
 
@@ -40,7 +44,7 @@ func (e *Engine) loadTemplates() {
 
 	e.templates = template.New("").Funcs(e.funcs)
 
-	filepath.WalkDir("internal/resources/views",
+	walkErr := filepath.WalkDir("internal/resources/views",
 		func(path string, d fs.DirEntry, err error) error {
 
 			if err != nil {
@@ -48,15 +52,36 @@ func (e *Engine) loadTemplates() {
 			}
 
 			if !d.IsDir() && (strings.HasSuffix(path, ".template") || strings.HasSuffix(path, ".tmpl") || strings.HasSuffix(path, ".html")) {
-				_, err = e.templates.ParseFiles(path)
-				if err != nil {
-					fmt.Errorf("Error occurred while parsing template '%s': %v", path, err)
-					return err
+				if _, err := e.templates.ParseFiles(path); err != nil {
+					// Report the broken template and keep loading the others;
+					// stopping here would hide every template after it.
+					parseErr := fmt.Errorf("template %s: %w", path, err)
+					e.parseErrors = append(e.parseErrors, parseErr)
+					log.Printf("Template parse error: %v", parseErr)
 				}
 			}
-			e.templates.Option("missingkey=error")
 			return nil
 		})
+	if walkErr != nil {
+		e.parseErrors = append(e.parseErrors, walkErr)
+		log.Printf("Template load error: %v", walkErr)
+	}
+
+	e.templates.Option("missingkey=error")
+}
+
+// parseErrorDetails describes the templates that failed to parse, for error
+// pages; empty if all templates parsed.
+func (e *Engine) parseErrorDetails() string {
+	if len(e.parseErrors) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("\n\nTemplates that could not be parsed:")
+	for _, err := range e.parseErrors {
+		b.WriteString("\n  " + err.Error())
+	}
+	return b.String()
 }
 
 func (e *Engine) registerCoreFunctions() {

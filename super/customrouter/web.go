@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"sync"
 
 	routeHelper "github.com/nicklasjeppesen/going_internal/super/customrouter/routeHelper"
 	global "github.com/nicklasjeppesen/going_internal/super/global"
@@ -246,10 +247,19 @@ func routeHandler(handler interface{}) Modifier {
 	}
 }
 
+var pathParamPattern = regexp.MustCompile(`\{([^\}]+)\}`)
+
+// pathParamCache caches the parameter keys per route pattern; there is a fixed
+// set of patterns, so it is computed once per route instead of per request.
+var pathParamCache sync.Map // pattern → []string
+
 // ExtractPathParams extracts parameter keys from a path like "/helloworld/{id}/{world}"
 func extractPathParams(pathTemplate string) []string {
-	re := regexp.MustCompile(`\{([^\}]+)\}`)
-	matches := re.FindAllStringSubmatch(pathTemplate, -1)
+	if cached, ok := pathParamCache.Load(pathTemplate); ok {
+		return cached.([]string)
+	}
+
+	matches := pathParamPattern.FindAllStringSubmatch(pathTemplate, -1)
 
 	var params []string
 	for _, match := range matches {
@@ -257,6 +267,7 @@ func extractPathParams(pathTemplate string) []string {
 			params = append(params, match[1])
 		}
 	}
+	pathParamCache.Store(pathTemplate, params)
 	return params
 }
 

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/nicklasjeppesen/going_internal/super/db/drivers"
 )
 
 type TestDB struct {
@@ -56,6 +57,7 @@ func NewInMemoryDB() (*TestDB, error) {
 	connectionString := "./testdb.db"
 
 	os.Remove(connectionString)
+	drivers.ResetPools() // the ORM's pooled connections still point at the removed file
 
 	db, err := sql.Open("sqlite3", connectionString)
 	if err != nil {

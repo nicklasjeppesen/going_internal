@@ -66,8 +66,7 @@ func (belong *BelongsTo[T]) Load() {
 	var accKeys = append(keys, syskeys...)
 	var defaultConn = belong.Holder.DBConnection()
 
-	dbconn := belong.Holder.DBConnection().Driver.Open(defaultConn.ConnectionString)
-	defer dbconn.Close()
+	dbconn := belong.Holder.DBConnection().Driver.Open(defaultConn.ConnectionString) // shared pool
 
 	var foreignKeyValue, _ = parent.Value(belong.foreignKey)
 	var driver = belong.Holder.DBConnection().Driver
@@ -109,8 +108,7 @@ func (belong *BelongsTo[T]) LoadMany(parents []ISystemFields, relationkey string
 	var accKeys = append(keys, syskeys...)
 	var defaultConn = belong.Holder.DBConnection()
 
-	dbconn := belong.Holder.DBConnection().Driver.Open(defaultConn.ConnectionString)
-	defer dbconn.Close()
+	dbconn := belong.Holder.DBConnection().Driver.Open(defaultConn.ConnectionString) // shared pool
 
 	var driver = belong.Holder.DBConnection().Driver
 	driver.SetTable(belong.Holder.GetTable())

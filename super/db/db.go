@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"maps"
 	"net/http"
 	"reflect"
@@ -139,17 +138,12 @@ func (parent *ParentDB[T]) addRoutes(data []T) []T {
 func (parent *ParentDB[T]) Select(query string) ([]map[string]any, error) {
 
 	var conn = parent.DbConn()
-	defer func() {
-		if db, ok := conn.(*sql.DB); ok {
-			db.Close()
-		}
-	}()
 
-	rows, err := conn.Query(query)
+	rows, err := conn.QueryContext(parent.ctx, query)
 	if err != nil {
-		log.Fatal(err)
-		fmt.Println("Error getting rows")
+		return nil, err
 	}
+	defer rows.Close()
 
 	var columns, _ = rows.Columns()
 	records := []map[string]any{}
@@ -160,15 +154,13 @@ func (parent *ParentDB[T]) Select(query string) ([]map[string]any, error) {
 			values[i] = new(any) // create addressable placeholder
 		}
 
-		err := rows.Scan(values[:]...)
+		if err := rows.Scan(values[:]...); err != nil {
+			return nil, err
+		}
 		for i, value := range values {
 			if value != nil {
 				values[i] = *value.(*any)
 			}
-		}
-		if err != nil {
-			log.Fatal(err)
-			fmt.Println("Error getting rows")
 		}
 		record := make(map[string]any, len(columns))
 		for i, value := range values {
@@ -180,7 +172,7 @@ func (parent *ParentDB[T]) Select(query string) ([]map[string]any, error) {
 
 	// Check for error during iteration
 	if err := rows.Err(); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	return records, nil
@@ -264,12 +256,6 @@ func (parent *ParentDB[T]) SaveNonGenerics() (IRepository, error) {
 func (parent *ParentDB[T]) Save() (T, error) {
 	var _db = parent.DbConn()
 
-	defer func() {
-		if db, ok := _db.(*sql.DB); ok {
-			// close connection if not in a transaction
-			db.Close()
-		}
-	}()
 
 	var object = (*parent.dbChild)
 	var keys = object.GetKeys()
@@ -281,7 +267,10 @@ func (parent *ParentDB[T]) Save() (T, error) {
 
 	returningValues := object.ReturningValues()
 
-	var dbResult = parent.creator.Driver.Save_(_db, keys, values, returningValues)
+	dbResult, err := parent.creator.Driver.Save_(_db, keys, values, returningValues)
+	if err != nil {
+		return object, err
+	}
 
 	for i, value := range returningValues {
 		object.SetValue(value, dbResult[i])
@@ -318,12 +307,6 @@ func (parent ParentDB[T]) GetNonGeneric() []IRepository {
 func (parent *ParentDB[T]) First() T {
 	var _db = parent.DbConn()
 
-	defer func() {
-		if db, ok := _db.(*sql.DB); ok {
-			// close connection if not in a transaction
-			db.Close()
-		}
-	}()
 
 	// Run SELECT query
 	var keys = (*parent.dbChild).GetKeys()
@@ -401,11 +384,6 @@ func (parent *ParentDB[T]) CheckingRelationForMany(childs []ISystemFields, relat
 func (parent *ParentDB[T]) Get() Collection[T] {
 
 	var _db = parent.DbConn()
-	defer func() {
-		if db, ok := _db.(*sql.DB); ok {
-			db.Close()
-		}
-	}()
 
 	child := (*parent.dbChild).DB(parent.ctx)
 	var keys = child.GetKeys()
@@ -441,11 +419,6 @@ func (parent *ParentDB[T]) Update() error {
 
 	child := *parent.dbChild
 	var _db = parent.DbConn()
-	defer func() {
-		if db, ok := _db.(*sql.DB); ok {
-			db.Close()
-		}
-	}()
 
 	var customColumns = (*parent.dbChild).GetKeys() // custom columns
 	var values = []any{}                            // custom columns + updated_At
@@ -457,9 +430,7 @@ func (parent *ParentDB[T]) Update() error {
 	customColumns = append(customColumns, "updated_at")
 	values = append(values, time.Now())
 	var id = child.PrimaryKey()
-	parent.creator.Driver.Where_("id", []any{id}).Update_(_db, customColumns, values)
-
-	return nil
+	return parent.creator.Driver.Where_("id", []any{id}).Update_(_db, customColumns, values)
 
 }
 
@@ -468,19 +439,8 @@ func (parent *ParentDB[T]) Delete() error {
 	child := *parent.dbChild
 	var primaryKey = child.PrimaryKey()
 	var _db = parent.DbConn()
-	defer func() {
-		if db, ok := _db.(*sql.DB); ok {
-			db.Close()
-		}
-	}()
 
-	var err = parent.creator.Driver.Delete_(_db, primaryKey)
-
-	if err != nil {
-		log.Fatal(err.Error())
-		return err
-	}
-	return nil
+	return parent.creator.Driver.Delete_(_db, primaryKey)
 }
 
 /*
@@ -491,10 +451,9 @@ func (parent *ParentDB[T]) Delete() error {
 * The parent model's connection is automatically set to the transaction.
  */
 func (parent *ParentDB[T]) Transaction(fn func(tx *sql.Tx) error) error {
-	conn := parent.creator.Driver.Open(parent.creator.ConnectionString)
+	conn := parent.creator.Driver.Open(parent.creator.ConnectionString) // shared pool
 	tx, err := conn.Begin()
 	if err != nil {
-		conn.Close()
 		return err
 	}
 
@@ -503,7 +462,6 @@ func (parent *ParentDB[T]) Transaction(fn func(tx *sql.Tx) error) error {
 
 	defer func() {
 		parent.dbconn = oldDbconn
-		conn.Close()
 	}()
 
 	defer func() {

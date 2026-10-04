@@ -21,11 +21,13 @@ type IDrivers interface {
 	LockForUpdate_()
 	SharedLock_()
 
-	// Terminate functions
+	// Terminate functions. Database errors are returned (or, for the read
+	// functions, logged with an empty result) — never fatal, so one failing
+	// query only fails its own request.
 	Get_(_db DBTX, columns []string) [][]any
-	Save_(_db DBTX, columns []string, values []any, returningValues []string) []any
+	Save_(_db DBTX, columns []string, values []any, returningValues []string) ([]any, error)
 	First_(_db DBTX, columns []string) []any // returning columns
-	Update_(_db DBTX, columns []string, values []any)
+	Update_(_db DBTX, columns []string, values []any) error
 	Delete_(_db DBTX, id any) error
 
 	// support functions

@@ -236,7 +236,9 @@ func (belong *BelongsToManyRelation[T]) Attach(args ...any) error {
 		switch v := arg.(type) {
 
 		case string, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
-			belong.attach(map[any]map[string]any{v: nil})
+			if attachErr := belong.attach(map[any]map[string]any{v: nil}); attachErr != nil {
+				err = attachErr
+			}
 
 		case PivotData:
 			err = errors.New("Not allowed type, missing foregeign id")
@@ -254,7 +256,7 @@ func (belong *BelongsToManyRelation[T]) Attach(args ...any) error {
 // Saving relationships.
 //
 // Attach a relation to many
-func (belong *BelongsToManyRelation[T]) attach(input map[any]map[string]any) {
+func (belong *BelongsToManyRelation[T]) attach(input map[any]map[string]any) error {
 	pivotDriver := belong.Holder.DB(belong.Holder.GetCtx()).GetDriver()
 	pivotDriver.SetTable(belong.pivotTable)
 
@@ -269,8 +271,11 @@ func (belong *BelongsToManyRelation[T]) attach(input map[any]map[string]any) {
 			systemColumns = append(systemColumns, pivotKey)
 			values = append(values, pivotValue)
 		}
-		pivotDriver.Save_(belong.Holder.DbConn(), systemColumns, values, nil)
+		if _, err := pivotDriver.Save_(belong.Holder.DbConn(), systemColumns, values, nil); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (belong *BelongsToManyRelation[T]) Detach(a ...any) error {
@@ -281,9 +286,7 @@ func (belong *BelongsToManyRelation[T]) Detach(a ...any) error {
 	for _, val := range a {
 		pivotDriver.Where_(belong.foreignKey, []any{val})
 	}
-	pivotDriver.Delete_(belong.Holder.DbConn(), nil)
-
-	return nil
+	return pivotDriver.Delete_(belong.Holder.DbConn(), nil)
 }
 
 // Updating exisiting pivot values.
@@ -296,7 +299,7 @@ func (belong *BelongsToManyRelation[T]) Detach(a ...any) error {
 // user.DB().First() // Do more stuff
 // return map[any]map[string]any{"T": nil}
 // }())
-func (belong *BelongsToManyRelation[T]) UpdateExistingPivot(input map[any]map[string]any) {
+func (belong *BelongsToManyRelation[T]) UpdateExistingPivot(input map[any]map[string]any) error {
 
 	for foreignId, pivotMap := range input {
 		pivotDriver := belong.Holder.DB(belong.Holder.GetCtx()).GetDriver()
@@ -314,9 +317,11 @@ func (belong *BelongsToManyRelation[T]) UpdateExistingPivot(input map[any]map[st
 			values = append(values, pivotValue)
 		}
 
-		pivotDriver.
-			Update_(belong.Holder.DbConn(), systemColumns, values)
+		if err := pivotDriver.Update_(belong.Holder.DbConn(), systemColumns, values); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func NewBelongsToMany[T IDBConnection[T]](current T, relationToEntiy IRepository) *BelongsToManyRelation[T] {
