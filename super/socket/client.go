@@ -2,6 +2,7 @@ package socket
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -35,10 +36,17 @@ type Client struct {
 	// The Authenticated user
 	Auth auth.Auth
 
-	// client properties
-	properties map[string]string
+	// client properties; other connections read them (e.g. a room listing
+	// peers), so they are guarded by propertiesMu.
+	propertiesMu sync.RWMutex
+	properties   map[string]string
 
 	closeOnce sync.Once
+
+	// sendMu guards egress against "send on closed channel": senders hold the
+	// read lock while sending, closeConnection takes the write lock to close.
+	sendMu sync.RWMutex
+	closed bool
 }
 
 var (
@@ -63,6 +71,8 @@ func NewClient(conn *websocket.Conn, manager *Manager, hub IBaseHub, auth auth.A
 }
 
 func (client *Client) SetProperty(key string, value string) {
+	client.propertiesMu.Lock()
+	defer client.propertiesMu.Unlock()
 	if client.properties == nil {
 		client.properties = make(map[string]string)
 	}
@@ -70,29 +80,45 @@ func (client *Client) SetProperty(key string, value string) {
 }
 
 func (client *Client) GetProperty(key string) (string, bool) {
-	if client.properties == nil {
-		return "", false
-	}
+	client.propertiesMu.RLock()
+	defer client.propertiesMu.RUnlock()
 	value, exists := client.properties[key]
 	return value, exists
 }
 
 func (client *Client) RemoveProperty(key string) {
-	if client.properties != nil {
-		delete(client.properties, key)
-	}
+	client.propertiesMu.Lock()
+	defer client.propertiesMu.Unlock()
+	delete(client.properties, key)
 }
 
 func (client *Client) GetManager() *Manager {
 	return client.manager
 }
 
-func (client *Client) SendEvent(event Event) {
+// trySend queues an event for writeMessages. It returns errClientClosed if the
+// connection is closed and errEgressFull if the client can't keep up.
+func (client *Client) trySend(event Event) error {
+	client.sendMu.RLock()
+	defer client.sendMu.RUnlock()
+	if client.closed {
+		return errClientClosed
+	}
 	select {
 	case client.egress <- event:
-		// Success
+		return nil
 	default:
-		// Channel is full
+		return errEgressFull
+	}
+}
+
+var (
+	errClientClosed = errors.New("client connection is closed")
+	errEgressFull   = errors.New("client egress channel full")
+)
+
+func (client *Client) SendEvent(event Event) {
+	if err := client.trySend(event); err == errEgressFull {
 		log.Printf("client %s egress channel full, dropping message", client.GetId())
 		client.closeConnection()
 	}
@@ -113,12 +139,10 @@ func (client *Client) SendMessage(command string, contents ...any) error {
 	}
 	var newMessage = Event{Type: command, Payload: b}
 
-	select {
-	case client.egress <- newMessage:
-		return nil
-	default:
-		return fmt.Errorf("client %s egress channel full", client.GetId())
+	if err := client.trySend(newMessage); err != nil {
+		return fmt.Errorf("client %s: %w", client.GetId(), err)
 	}
+	return nil
 }
 
 func (client *Client) GetId() string {
@@ -128,7 +152,12 @@ func (client *Client) GetId() string {
 func (c *Client) closeConnection() {
 	c.closeOnce.Do(func() {
 		c.hub.CancelConnection(c) // Custom method.
+
+		c.sendMu.Lock()
+		c.closed = true
 		close(c.egress)
+		c.sendMu.Unlock()
+
 		c.manager.removeClient(c)
 		c.hub.unregisterClient(c) // remove client from all rooms and, and messageHub client List
 		c.connection.Close()

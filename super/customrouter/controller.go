@@ -58,18 +58,21 @@ func (b *AfterAction) Except(actions ...string) *AfterAction {
 }
 
 // BaseController is meant to be embedded (by value) in your controllers. It
-// gives them AddBeforeAction/AddAfterAction, typically called from Loader(),
-// e.g.:
+// gives them AddBeforeAction/AddAfterAction, typically called from Loader().
+//
+// Controllers registered as a pointer get a fresh instance per request (see
+// buildControllerAction), so a BeforeAction may set per-request fields such
+// as the current user:
 //
 //	type HomeController struct {
 //		customrouter.BaseController
+//		logger helper.ILogger // dependency, resolved from the Container
+//		userID string         // per request, set by setUser
 //	}
 //
-//	func (c *HomeController) Loader() *HomeController {
-//		c.AddBeforeAction(customrouter.BeforeAction{
-//			Name:    "authenticate_user",
-//			Handler: c.authenticateUser,
-//		})
+//	func (c *HomeController) Loader(logger helper.ILogger) *HomeController {
+//		c.logger = logger
+//		c.AddBeforeAction(c.setUser).Except("Index")
 //		return c
 //	}
 type BaseController struct {
@@ -93,6 +96,17 @@ func (b *BaseController) AddAfterAction(action func(request request.Requestbase)
 	}
 	b.afterActions = append(b.afterActions, after)
 	return after
+}
+
+// resetHooks clears the hooks copied from the registered controller, so the
+// per-request instance only gets the ones its own Loader call registers.
+func (b *BaseController) resetHooks() {
+	b.beforeActions = nil
+	b.afterActions = nil
+}
+
+type hookResetter interface {
+	resetHooks()
 }
 
 // BeforeActions returns the hooks registered via AddBeforeAction, in order.
@@ -135,34 +149,31 @@ func containsFold(list []string, s string) bool {
 	return false
 }
 
-// buildControllerAction resolves a controller's dependencies (via Loader, if
-// defined), looks up the target action method, and wraps everything in a
-// Modifier that also runs any matching BeforeAction/AfterAction hooks the
-// resolved controller has registered.
+// buildControllerAction wraps a controller action in a Modifier that, per
+// request, builds the controller (via Loader, if defined), runs its matching
+// BeforeAction hooks, calls the action and then runs its AfterAction hooks.
 //
-// Resolution (including the Loader call) happens once, at route-registration
-// time — not per request — so it behaves like constructor injection. If you
-// need per-request/scoped dependencies (e.g. the current user), fetch them in
-// a BeforeAction instead, using the request/context.
+// A controller registered as a pointer (e.g. new(HomeController)) gets a fresh
+// instance for every request: a shallow copy of the registered controller,
+// then Loader is called on that copy. Dependencies come from the Container
+// (cached singletons), and fields set by a BeforeAction (e.g. the current
+// user) belong to that one request only — concurrent requests never share
+// them, and Loader's hooks are registered once per instance.
+//
+// A controller registered as a value (e.g. HomeController{}) is resolved once
+// and shared; its value-receiver methods work on copies anyway.
+//
+// Everything is resolved once at registration too, so a missing dependency or
+// a misspelled action still panics at startup.
 func buildControllerAction(container *Container, controller interface{}, methodName string) Modifier {
-	resolved := ResolveDependencies(container, controller)
-	action := resolveControllerMethod(resolved, methodName)
-
-	var befores []*BeforeAction
-	if provider, ok := resolved.(beforeActionProvider); ok {
-		befores = provider.BeforeActions()
-	}
-
-	var afters []*AfterAction
-	if provider, ok := resolved.(afterActionProvider); ok {
-		afters = provider.AfterActions()
-	}
+	newController := controllerFactory(container, controller)
+	resolveControllerMethod(newController(), methodName) // fail fast at startup
 
 	return func(req *request.Requestbase) {
+		resolved := newController()
+		action := resolveControllerMethod(resolved, methodName)
 
-		//_request := request.Requestbase{W: w, R: r}
-
-		for _, before := range befores {
+		for _, before := range beforeActionsOf(resolved) {
 			if !actionApplies(methodName, before.only, before.except) {
 				continue
 			}
@@ -179,13 +190,49 @@ func buildControllerAction(container *Container, controller interface{}, methodN
 		}
 		request.CallUnknownFunc(action, urlParam, req.W, req.R)
 
-		for _, after := range afters {
+		for _, after := range afterActionsOf(resolved) {
 			if !actionApplies(methodName, after.only, after.except) {
 				continue
 			}
 			after.Handler(*req)
 		}
 	}
+}
+
+// controllerFactory returns a func that produces a ready-to-use controller.
+// For a pointer to a struct it builds a new instance on every call (a copy of
+// the registered controller with its hooks cleared, then Loader); for
+// anything else it resolves once and always returns that.
+func controllerFactory(container *Container, controller interface{}) func() interface{} {
+	value := reflect.ValueOf(controller)
+	if value.Kind() != reflect.Pointer || value.IsNil() || value.Elem().Kind() != reflect.Struct {
+		resolved := ResolveDependencies(container, controller)
+		return func() interface{} { return resolved }
+	}
+
+	registered := value.Elem()
+	return func() interface{} {
+		instance := reflect.New(registered.Type())
+		instance.Elem().Set(registered)
+		if hooks, ok := instance.Interface().(hookResetter); ok {
+			hooks.resetHooks()
+		}
+		return ResolveDependencies(container, instance.Interface())
+	}
+}
+
+func beforeActionsOf(controller interface{}) []*BeforeAction {
+	if provider, ok := controller.(beforeActionProvider); ok {
+		return provider.BeforeActions()
+	}
+	return nil
+}
+
+func afterActionsOf(controller interface{}) []*AfterAction {
+	if provider, ok := controller.(afterActionProvider); ok {
+		return provider.AfterActions()
+	}
+	return nil
 }
 
 // resolveController checks whether the controller defines a Loader(...) method.

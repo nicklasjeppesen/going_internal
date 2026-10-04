@@ -1,6 +1,8 @@
 package socket
 
 import (
+	"sync"
+
 	"github.com/nicklasjeppesen/going_internal/super/channels"
 )
 
@@ -21,9 +23,60 @@ type IBaseHub interface {
 
 type BaseHub struct {
 	BaseURL  string
-	Clients  map[string]*Client
 	Rooms    Rooms // client
 	handlers map[string]func(parameter []string, c *Client) error
+
+	// clients maps a user id to that user's open connections (one per tab or
+	// device). Every connection runs its handlers in its own goroutine, so the
+	// map is only touched through the methods below, which hold clientsMu.
+	clientsMu sync.RWMutex
+	clients   map[string]map[*Client]struct{}
+}
+
+// AddClient registers the connection under its authenticated user id. A user
+// may have several connections at once (tabs, devices); each is kept until it
+// closes.
+func (hub *BaseHub) AddClient(client *Client) {
+	hub.clientsMu.Lock()
+	defer hub.clientsMu.Unlock()
+
+	userId := client.Auth.UserIdAsString()
+	if hub.clients[userId] == nil {
+		hub.clients[userId] = make(map[*Client]struct{})
+	}
+	hub.clients[userId][client] = struct{}{}
+}
+
+// ClientsFor returns the user's open connections (empty if offline).
+func (hub *BaseHub) ClientsFor(userId string) []*Client {
+	hub.clientsMu.RLock()
+	defer hub.clientsMu.RUnlock()
+
+	clients := make([]*Client, 0, len(hub.clients[userId]))
+	for client := range hub.clients[userId] {
+		clients = append(clients, client)
+	}
+	return clients
+}
+
+// IsOnline reports whether the user has at least one open connection.
+func (hub *BaseHub) IsOnline(userId string) bool {
+	hub.clientsMu.RLock()
+	defer hub.clientsMu.RUnlock()
+	return len(hub.clients[userId]) > 0
+}
+
+// SendToUser sends the message to every open connection of the user. It
+// returns true if at least one connection accepted it, so the caller can fall
+// back to e.g. web push when the user is offline.
+func (hub *BaseHub) SendToUser(userId string, command string, contents ...any) bool {
+	delivered := false
+	for _, client := range hub.ClientsFor(userId) {
+		if client.SendMessage(command, contents...) == nil {
+			delivered = true
+		}
+	}
+	return delivered
 }
 
 func (hub *BaseHub) SetbaseURL(url string) {
@@ -54,7 +107,15 @@ func (hub *BaseHub) CancleConnecetion(*Client) {
 */
 func (hub *BaseHub) unregisterClient(client *Client) {
 	hub.Rooms.RemoveClientFromRooms(client)
-	delete(hub.Clients, client.Auth.UserIdAsString())
+
+	hub.clientsMu.Lock()
+	defer hub.clientsMu.Unlock()
+	// Remove only this connection; the user's other tabs stay registered.
+	userId := client.Auth.UserIdAsString()
+	delete(hub.clients[userId], client)
+	if len(hub.clients[userId]) == 0 {
+		delete(hub.clients, userId)
+	}
 }
 
 /*
@@ -67,7 +128,7 @@ func (hub *BaseHub) On(command string, callback func([]string, *Client) error) {
 func (hub *BaseHub) SetupDefaultHub() {
 	hub.Rooms = newRooms()
 	hub.handlers = make(map[string]func(event []string, c *Client) error)
-	hub.Clients = make(map[string]*Client)
+	hub.clients = make(map[string]map[*Client]struct{})
 }
 
 /*

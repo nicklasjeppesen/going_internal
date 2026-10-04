@@ -1,6 +1,9 @@
 package customrouter
 
-import "reflect"
+import (
+	"reflect"
+	"sync"
+)
 
 // ---- Dependency injection container ----
 
@@ -14,7 +17,11 @@ type binding struct {
 // Container is a minimal DI container that maps a type (normally an
 // interface) to a factory function that produces it. It's used to resolve
 // the parameters of a controller's Loader(...) method.
+//
+// It is safe for concurrent use: controllers call Loader per request, so
+// resolve runs from many goroutines at once.
 type Container struct {
+	mu       sync.Mutex
 	bindings map[reflect.Type]*binding
 }
 
@@ -43,11 +50,15 @@ func (c *Container) Register(factory interface{}) *Container {
 		panic("customrouter: factory passed to Register must take no arguments and return exactly one value, e.g. func() helper.ILogger")
 	}
 	returnType := factoryType.Out(0)
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.bindings[returnType] = &binding{factory: reflect.ValueOf(factory)}
 	return c
 }
 
 func (c *Container) resolve(t reflect.Type) (reflect.Value, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	b, ok := c.bindings[t]
 	if !ok {
 		return reflect.Value{}, false

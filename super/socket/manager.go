@@ -120,7 +120,14 @@ func (m *Manager) removeClient(client *Client) {
 
 // Send a message to all clients listen on this managers hub
 func (m *Manager) Broadcast(command string, args ...any) {
+	m.RLock()
+	clients := make([]*Client, 0, len(m.clients))
 	for client := range m.clients {
+		clients = append(clients, client)
+	}
+	m.RUnlock()
+
+	for _, client := range clients {
 		client.SendMessage(command, args...)
 	}
 }
