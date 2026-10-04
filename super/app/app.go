@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -69,7 +70,7 @@ func (app App) Start() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	recoveryHandler := middleware.PanicRecovery(app.Router)
+	recoveryHandler := middleware.PanicRecovery(middleware.SecurityHeaders(limitRequestBody(app.Router, maxBodyBytes())))
 
 	// Serve static files from the "assets" directory
 	fs := http.FileServer(http.Dir("internal/resources/assets"))
@@ -79,6 +80,13 @@ func (app App) Start() {
 	server := &http.Server{
 		Addr:    getPort(),
 		Handler: recoveryHandler,
+		// Without timeouts a client can hold a connection (and a goroutine)
+		// open forever by sending its request very slowly ("slowloris").
+		// Websockets are not affected: the upgrade clears these deadlines.
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      120 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	// 3. Start server
@@ -122,6 +130,29 @@ func (app App) LoadEnv() {
 	if enverr != nil {
 		log.Fatalf("Error loading .env file")
 	}
+}
+
+// defaultMaxBodyBytes caps a request body (10 MB) unless APP_MAX_BODY_BYTES
+// says otherwise. Bodies are read into memory (JSON, CSRF check), so without a
+// cap one request could make the server allocate gigabytes.
+const defaultMaxBodyBytes = 10 << 20
+
+func maxBodyBytes() int64 {
+	if n, err := strconv.ParseInt(os.Getenv("APP_MAX_BODY_BYTES"), 10, 64); err == nil && n > 0 {
+		return n
+	}
+	return defaultMaxBodyBytes
+}
+
+// limitRequestBody makes reading more than limit bytes of a request body fail
+// (http.MaxBytesReader), before any handler or middleware reads it.
+func limitRequestBody(next http.Handler, limit int64) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Body != nil {
+			r.Body = http.MaxBytesReader(w, r.Body, limit)
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func getPort() string {

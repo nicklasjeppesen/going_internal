@@ -10,12 +10,22 @@ import (
 	"os"
 
 	"github.com/nicklasjeppesen/going_internal/super/constants"
-	"github.com/nicklasjeppesen/going_internal/super/util"
+	sessionstore "github.com/nicklasjeppesen/going_internal/super/session"
 
 	struct_to_map "github.com/nicklasjeppesen/going_internal/super/util"
 
 	"github.com/gorilla/sessions"
 )
+
+// store gives the shared, encrypted cookie store (see super/session). It is
+// looked up on use, after .env has been loaded.
+var store sharedStore
+
+type sharedStore struct{}
+
+func (sharedStore) Get(r *http.Request, name string) (*sessions.Session, error) {
+	return sessionstore.Store().Get(r, name)
+}
 
 type PageTemplateAssets struct {
 	JsFiles  []template.HTMLAttr
@@ -29,10 +39,6 @@ type InertiaInfo struct {
 }
 
 type viewparam = map[string]any
-
-// Create a cookie-based session store
-var key = util.GetEnv(constants.APP_Key, "")
-var store = sessions.NewCookieStore([]byte(key))
 
 func NewPageTemplateAssets() (p *PageTemplateAssets) {
 	p = new(PageTemplateAssets)

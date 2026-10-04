@@ -3,11 +3,12 @@ package response
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 
 	"github.com/gorilla/sessions"
 	"github.com/nicklasjeppesen/going_internal/super/constants"
-	"github.com/nicklasjeppesen/going_internal/super/util"
+	"github.com/nicklasjeppesen/going_internal/super/session"
 	. "github.com/nicklasjeppesen/going_internal/super/util"
 )
 
@@ -21,6 +22,10 @@ import (
 //
 
 // Struct to handle different kind of response, a controller can return.
+//
+// A Response is safe to share (apps typically keep one package-level
+// instance): WithErrors and With never change the receiver, they return a
+// new Response that carries the data for this one reply.
 type Response struct {
 	errorMessage map[string][]string
 	flashData    map[string]string
@@ -46,6 +51,7 @@ func NewResponse() *Response {
 //
 // Any other type will cause a panic.
 func (response *Response) WithErrors(errors any) *Response {
+	response = response.clone()
 	switch e := errors.(type) {
 	case map[string]string:
 		parsedErrors := make(map[string][]string, len(e))
@@ -70,8 +76,17 @@ func (response *Response) WithErrors(errors any) *Response {
 }
 
 func (response *Response) With(data map[string]string) *Response {
+	response = response.clone()
 	response.flashData = data
 	return response
+}
+
+// clone returns a copy, so per-request data never ends up on a shared Response.
+func (response *Response) clone() *Response {
+	c := NewResponse()
+	maps.Copy(c.errorMessage, response.errorMessage)
+	maps.Copy(c.flashData, response.flashData)
+	return c
 }
 
 func (response *Response) ErrorMessage() map[string][]string {
@@ -140,11 +155,7 @@ func (c *Response) Back() func(http.ResponseWriter, *http.Request) {
 }
 
 func getSession(r *http.Request) *sessions.Session {
-	var key = util.GetEnv(constants.APP_Key, "")
-	var store = sessions.NewCookieStore([]byte(key))
-	session, _ := store.Get(r, constants.Session_info)
-	session.Options.Path = "/"
-	return session
+	return session.Get(r)
 }
 
 func (c *Response) setSessionData(request *http.Request, w http.ResponseWriter) error {
@@ -179,10 +190,16 @@ func parseValueToSessions(value any) string {
 
 }
 
+// GetInputs returns the submitted form fields, to show again as old input.
+// Passwords, tokens and other secrets are left out: they would otherwise be
+// stored in the session cookie and could be shown in the next page.
 func GetInputs(r *http.Request) map[string]any {
 	data := make(map[string]any)
 
 	for key, values := range r.Form {
+		if session.IsSensitive(key) {
+			continue
+		}
 		for _, value := range values {
 			data[key] = value
 		}

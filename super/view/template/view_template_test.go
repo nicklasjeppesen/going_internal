@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/nicklasjeppesen/going_internal/super/constants"
+	sessionstore "github.com/nicklasjeppesen/going_internal/super/session"
 )
 
 func TestMain(m *testing.M) {
@@ -42,7 +43,7 @@ func TestGetDataConsumesSessionOnce(t *testing.T) {
 	// A session cookie holding all three values
 	setup := httptest.NewRecorder()
 	setupReq := httptest.NewRequest(http.MethodGet, "/", nil)
-	session, _ := getSessionStore().Get(setupReq, constants.Session_info)
+	session := sessionstore.Get(setupReq)
 	session.Values[constants.Errors] = `{"email":["required"]}`
 	session.Values[constants.Old] = `{"email":"a@b.dk"}`
 	session.Values[constants.Flash] = `{"msg":"saved"}`

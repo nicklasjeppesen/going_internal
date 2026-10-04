@@ -30,11 +30,13 @@ func TestWithErrorsString(t *testing.T) {
 	resp := NewResponse()
 	result := resp.WithErrors("something went wrong")
 
-	if result != resp {
-		t.Error("WithErrors should return the same Response instance for chaining")
+	// WithErrors returns a new Response and leaves the receiver unchanged, so a
+	// shared (package-level) Response never carries one request's errors.
+	if result == resp || len(resp.ErrorMessage()) != 0 {
+		t.Error("WithErrors should return a new Response and leave the receiver unchanged")
 	}
 
-	errors := resp.ErrorMessage()
+	errors := result.ErrorMessage()
 	if len(errors) != 1 {
 		t.Fatalf("expected 1 error, got %d", len(errors))
 	}
@@ -53,9 +55,7 @@ func TestWithErrorsMapStringString(t *testing.T) {
 		"email":    "required",
 		"password": "min 8 chars",
 	}
-	resp.WithErrors(errs)
-
-	result := resp.ErrorMessage()
+	result := resp.WithErrors(errs).ErrorMessage()
 	if len(result) != 2 {
 		t.Fatalf("expected 2 errors, got %d", len(result))
 	}
@@ -73,9 +73,7 @@ func TestWithErrorsMapStringSlice(t *testing.T) {
 		"email": {"required", "invalid format"},
 		"name":  {"too short"},
 	}
-	resp.WithErrors(errs)
-
-	result := resp.ErrorMessage()
+	result := resp.WithErrors(errs).ErrorMessage()
 	if len(result) != 2 {
 		t.Fatalf("expected 2 error fields, got %d", len(result))
 	}
@@ -103,11 +101,11 @@ func TestWithSetsFlashData(t *testing.T) {
 	flash := map[string]string{"success": "Profile updated"}
 	result := resp.With(flash)
 
-	if result != resp {
-		t.Error("With should return the same Response instance for chaining")
+	if result == resp || len(resp.FlashData()) != 0 {
+		t.Error("With should return a new Response and leave the receiver unchanged")
 	}
 
-	data := resp.FlashData()
+	data := result.FlashData()
 	if data["success"] != "Profile updated" {
 		t.Errorf("expected 'Profile updated', got %v", data["success"])
 	}
@@ -115,10 +113,9 @@ func TestWithSetsFlashData(t *testing.T) {
 
 func TestWithOverwritesFlashData(t *testing.T) {
 	resp := NewResponse()
-	resp.With(map[string]string{"success": "first"})
-	resp.With(map[string]string{"info": "second"})
-
-	data := resp.FlashData()
+	data := resp.With(map[string]string{"success": "first"}).
+		With(map[string]string{"info": "second"}).
+		FlashData()
 	if len(data) != 1 {
 		t.Errorf("expected 1 flash entry after overwrite, got %d", len(data))
 	}
@@ -309,13 +306,13 @@ func TestChainingWithErrorsAndWith(t *testing.T) {
 	resp := NewResponse()
 	result := resp.WithErrors("error").With(map[string]string{"success": "done"})
 
-	if result != resp {
-		t.Error("chaining should return the same instance")
+	if len(resp.ErrorMessage()) != 0 || len(resp.FlashData()) != 0 {
+		t.Error("chaining should not change the original Response")
 	}
-	if len(resp.ErrorMessage()) != 1 {
+	if len(result.ErrorMessage()) != 1 {
 		t.Error("expected 1 error")
 	}
-	if resp.FlashData()["success"] != "done" {
+	if result.FlashData()["success"] != "done" {
 		t.Error("expected flash data 'done'")
 	}
 }

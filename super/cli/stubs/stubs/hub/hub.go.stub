@@ -36,8 +36,9 @@ func ({{.Name}} *{{.Model}}) CancelConnection(client *socket.Client) {
 func ({{.Name}} *{{.Model}}) AppReceiver(message channels.Socket) {
 
 	fmt.Println("MessageHub Just Got a message from The Internal app")
-	if client, ok := MessageHub.Clients["1"]; ok {
+	// SendToUser delivers to every open connection (tab) of the user, and
+	// returns false if the user is offline.
+	if {{.Name}}.SendToUser("1", "sendMessage", "Congrats, you just became a father") {
 		fmt.Println("Found a client")
-		client.SendMessage("sendMessage", "Congrats, you just became a father")
 	}
 }

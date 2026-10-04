@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/sessions"
 	"github.com/nicklasjeppesen/going_internal/super/constants"
+	sessionstore "github.com/nicklasjeppesen/going_internal/super/session"
 	"github.com/nicklasjeppesen/going_internal/super/util"
 )
 
@@ -115,10 +116,7 @@ func getData(r *http.Request, w http.ResponseWriter, tmplView string, prop ...vi
 
 	// Errors, old input and flash messages live in the same session cookie:
 	// read it once, and save it once if any of them were consumed.
-	session, err := getSessionStore().Get(r, constants.Session_info)
-	if err != nil {
-		fmt.Println("Fejl ved hentning af session:", err)
-	}
+	session := sessionstore.Get(r)
 
 	consumed := addErrors(data, session)
 	consumed = addViewData(data, session, constants.Old) || consumed
@@ -132,20 +130,6 @@ func getData(r *http.Request, w http.ResponseWriter, tmplView string, prop ...vi
 	data[constants.Csrf_token] = r.Context().Value(constants.Csrf_token)
 	data["ContentView"] = tmplView
 	return data
-}
-
-var (
-	sessionStoreOnce sync.Once
-	sessionStore     *sessions.CookieStore
-)
-
-// getSessionStore returns the cookie store for the session, created once
-// (the app key is loaded from .env before the first request).
-func getSessionStore() *sessions.CookieStore {
-	sessionStoreOnce.Do(func() {
-		sessionStore = sessions.NewCookieStore([]byte(util.GetEnv(constants.APP_Key, "")))
-	})
-	return sessionStore
 }
 
 // addErrors adds validation errors from the session to the view data. It

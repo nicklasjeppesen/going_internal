@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 
+	auth "github.com/nicklasjeppesen/going_internal/super/auth"
 	constants "github.com/nicklasjeppesen/going_internal/super/constants"
 	"github.com/nicklasjeppesen/going_internal/super/request"
 
@@ -32,9 +33,9 @@ func JWTMiddleware(next request.Handler) request.Handler {
 		svc := security.NewJWTService()
 		token, claim, err := svc.Verify(cookie.Value)
 
-		if err != nil || !token.Valid {
+		// A token is only valid while its session is: logout revokes it.
+		if err != nil || !token.Valid || !auth.SessionValid(req.R.Context(), claim.Subject, claim.SessionID) {
 			http.Error(req.W, "Invalid token", http.StatusUnauthorized)
-			http.Redirect(req.W, req.R, referer, http.StatusMovedPermanently)
 			return
 		}
 
