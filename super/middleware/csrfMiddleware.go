@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"crypto/subtle"
+	"errors"
 	// Adjust the module path as needed
 
 	"bytes"
@@ -65,15 +67,12 @@ func CsrfMiddleware(next request.Handler) request.Handler {
 			return
 		}
 
-		contentType := req.R.Header.Get("Content-Type")
-		var token string
-		if strings.HasPrefix(contentType, "application/json") {
-			token = CSRFTokenFromJson(req.W, req.R)
-		} else {
-			token = CSRFTokenFromHttp(req.W, req.R, contentType)
+		token, ok := csrfToken(req.W, req.R)
+		if !ok {
+			return // the body could not be read; the error is already written
 		}
 
-		if token == "" || token != cookie.Value {
+		if token == "" || subtle.ConstantTimeCompare([]byte(token), []byte(cookie.Value)) != 1 {
 			http.Error(req.W, "Invalid CSRF token", http.StatusUnauthorized)
 			return
 		}
@@ -81,6 +80,52 @@ func CsrfMiddleware(next request.Handler) request.Handler {
 		next(req)
 
 	}
+}
+
+// csrfToken reads the submitted token from the JSON or form body. ok is false
+// if the body could not be read; the error response (413 for a body over the
+// limit, 400 otherwise) has then been written.
+func csrfToken(w http.ResponseWriter, r *http.Request) (token string, ok bool) {
+	contentType := r.Header.Get("Content-Type")
+
+	if strings.HasPrefix(contentType, "application/json") {
+		body, err := io.ReadAll(r.Body)
+		r.Body.Close()
+		if err != nil {
+			writeBodyError(w, err)
+			return "", false
+		}
+		r.Body = io.NopCloser(bytes.NewBuffer(body))
+
+		var input Input
+		if err := json.Unmarshal(body, &input); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return "", false
+		}
+		return input.Csrf_token, true
+	}
+
+	var err error
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		err = r.ParseMultipartForm(32 << 20) // 32 MB in memory, the rest in temp files
+	} else {
+		err = r.ParseForm()
+	}
+	if err != nil {
+		writeBodyError(w, err)
+		return "", false
+	}
+	return r.FormValue(constants.Csrf_token), true
+}
+
+// writeBodyError answers a request whose body could not be read.
+func writeBodyError(w http.ResponseWriter, err error) {
+	var tooLarge *http.MaxBytesError
+	if errors.As(err, &tooLarge) {
+		http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+	http.Error(w, "Invalid request body", http.StatusBadRequest)
 }
 
 func CSRFTokenFromHttp(w http.ResponseWriter, r *http.Request, contentType string) string {

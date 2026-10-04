@@ -22,6 +22,7 @@ import (
 	"time"
 
 	middleware "github.com/nicklasjeppesen/going_internal/super/middleware"
+	"github.com/nicklasjeppesen/going_internal/super/request"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq" // PostgreSQL driver
@@ -144,14 +145,12 @@ func maxBodyBytes() int64 {
 	return defaultMaxBodyBytes
 }
 
-// limitRequestBody makes reading more than limit bytes of a request body fail
-// (http.MaxBytesReader), before any handler or middleware reads it.
+// limitRequestBody makes reading more than limit bytes of a request body fail,
+// before any handler or middleware reads it. A route can raise the limit for
+// itself, e.g. for uploads: Post(...).MaxBody(25 << 20).
 func limitRequestBody(next http.Handler, limit int64) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Body != nil {
-			r.Body = http.MaxBytesReader(w, r.Body, limit)
-		}
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(w, request.LimitBody(w, r, limit))
 	})
 }
 

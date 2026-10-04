@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"regexp"
 	"sync"
+	"time"
 
 	routeHelper "github.com/nicklasjeppesen/going_internal/super/customrouter/routeHelper"
 	global "github.com/nicklasjeppesen/going_internal/super/global"
@@ -199,6 +200,24 @@ type Route struct {
 
 	// Middleware: list of middlewares that have to return true, to reach the URL
 	middleware []middlewarestdlib.Middleware
+
+	// maxBody, if set, replaces the server's request body limit for this route.
+	maxBody int64
+}
+
+// uploadReadTimeout is how long a route with MaxBody may take to receive its
+// request body (the server's ReadTimeout would cut slow uploads off).
+const uploadReadTimeout = 15 * time.Minute
+
+// MaxBody lets this route accept request bodies up to n bytes (the server
+// default is 10 MB) and gives it up to 15 minutes to receive the body, e.g.:
+//
+//	webrouter.Post("/chats/{id}/attachments", c, "Create").MaxBody(25 << 20)
+//
+// It is applied before any middleware reads the body.
+func (router *Route) MaxBody(n int64) *Route {
+	router.maxBody = n
+	return router
 }
 
 // httpHandler is an internal helper that constructs a Route (with parameter
@@ -346,7 +365,12 @@ func (router *MyRouter) RegisterRoutes(r *http.ServeMux) {
 	for _, route := range router.Handlers {
 		final := chain(chain(route.handler, route.middleware), router.middlewares)
 
+		maxBody := route.maxBody
 		r.HandleFunc(route.httpType+" "+route.path, func(w http.ResponseWriter, req *http.Request) {
+			if maxBody > 0 {
+				request.SetBodyLimit(req, maxBody)
+				_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(uploadReadTimeout))
+			}
 			final(&request.Requestbase{W: w, R: req})
 		})
 
