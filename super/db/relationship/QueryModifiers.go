@@ -14,7 +14,7 @@ type orderCondition struct {
 	desc   bool
 }
 
-// Querymidifier contains where/whereIn/OrderBy-condition, that skal be use on the relation entity (T)
+// QueryModifiers contains where/whereIn/OrderBy conditions that are applied to the relation entity (T)
 // This allow filtering and sorting to be implemented
 type QueryModifiers[T IDB[T], R any] struct {
 	self     R
@@ -48,7 +48,7 @@ func (q *QueryModifiers[T, R]) OrderByDesc(column string) R {
 	//sreturn belong
 }
 
-// Apply kører de gemte betingelser på query/T og returnerer den (chainbare) query klar til .Get().
+// Apply runs the stored conditions on query/T and returns the (chainable) query, ready for .Get().
 func (q *QueryModifiers[T, R]) Apply(query T) T {
 	for _, w := range q.wheres {
 		query = query.Where(w.column, w.values...)

@@ -123,7 +123,7 @@ func getData(r *http.Request, w http.ResponseWriter, tmplView string, prop ...vi
 	consumed = addViewData(data, session, constants.Flash) || consumed
 
 	if consumed {
-		session.Options.Path = "/" // Sikrer samme sti
+		session.Options.Path = "/" // Ensures the same path
 		session.Save(r, w)
 	}
 

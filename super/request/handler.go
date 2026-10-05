@@ -39,7 +39,7 @@ type ArgHandler func(w http.ResponseWriter, r *http.Request, argStrings []string
 type structMeta struct {
 	bodyFieldType reflect.Type
 	bodyIsPointer bool
-	requiredTags  []string // pre-parsed json tags til validering
+	requiredTags  []string // pre-parsed json tags for validation
 }
 
 var planCache sync.Map       // map[reflect.Type][]ArgHandler
@@ -117,7 +117,7 @@ func buildHandler(paramType reflect.Type) ArgHandler {
 		}
 	}
 
-	// fallback for evt. andre structs
+	// fallback for any other structs
 	return func(w http.ResponseWriter, r *http.Request, _ []string, _ *int) (reflect.Value, error) {
 		_, v := handleStructValue(w, r, paramType)
 		return v, nil
@@ -133,7 +133,7 @@ func handleRequestBodyWithMeta(w http.ResponseWriter, r *http.Request, requestBo
 	}
 	ormStruct := reflect.New(elemType)
 
-	// Parse body ind i den nye struct
+	// Parse the body into the new struct
 	if err := parseDataToOrm(r, ormStruct.Interface()); err != nil {
 		return reflect.Value{}, err
 	}
@@ -350,7 +350,7 @@ func validateRequiredJSONFields(body []byte, t reflect.Type) error {
 	for i := 0; i < t.NumField(); i++ {
 
 		tag := t.Field(i).Tag.Get("json")
-		tag = strings.Split(tag, ",")[0] // Foreslået af AI, skal lige tjekkes
+		tag = strings.Split(tag, ",")[0] // Suggested by AI, needs to be checked
 
 		if tag == "" || tag == "-" {
 			continue

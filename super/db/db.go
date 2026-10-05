@@ -5,14 +5,13 @@ import (
 	"database/sql"
 	"fmt"
 	"maps"
-	"net/http"
 	"reflect"
 	"time"
 
-	relations "github.com/nicklasjeppesen/going_internal/super/db/relationship"
 	. "github.com/nicklasjeppesen/going_internal/super/collections"
 	"github.com/nicklasjeppesen/going_internal/super/customrouter/routeHelper"
 	drivers "github.com/nicklasjeppesen/going_internal/super/db/drivers"
+	relations "github.com/nicklasjeppesen/going_internal/super/db/relationship"
 	. "github.com/nicklasjeppesen/going_internal/super/db/types"
 	global "github.com/nicklasjeppesen/going_internal/super/global"
 	struct_to_map "github.com/nicklasjeppesen/going_internal/super/util"
@@ -43,7 +42,6 @@ func (activerecord *ActiveRecord[T]) HasManyMorph[U IDBConnection[U]](relationFr
 	return relations.NewHasManyMorph(relationFrom, activerecord)
 }
 
-
 func (activerecord *ActiveRecord[T]) BelongsToMorph[U IRepository](relatedModels []U, delegateAble string) *relations.BelongsToMorphRelation[U] {
 	return relations.NewBelongsToMorph(delegateAble, relatedModels, activerecord)
 }
@@ -67,8 +65,6 @@ func (activerecord *ActiveRecord[T]) ToJson() map[string]any {
 
 }
 
-
-
 type ParentDB[T IDB[T]] struct {
 	creator  DBCreator
 	dbChild  *T // any type
@@ -90,8 +86,6 @@ func (parent *ParentDB[T]) GetDriver() IDrivers {
 	return parent.creator.Driver
 }
 
-
-
 func (parent *ParentDB[T]) GetWith() []string {
 	return parent.with
 }
@@ -104,7 +98,7 @@ func (parent *ParentDB[T]) AddRoutes(prefix string, callback ...Responsehandler)
 	return parent
 }
 
-// search for a key in systemholder og DBsetup
+// search for a key in systemholder and DBsetup
 func (parent *ParentDB[T]) addRoutes(data []T) []T {
 
 	var allRoutes = global.GetRouteNamedMap()
@@ -256,7 +250,6 @@ func (parent *ParentDB[T]) SaveNonGenerics() (IRepository, error) {
 func (parent *ParentDB[T]) Save() (T, error) {
 	var _db = parent.DbConn()
 
-
 	var object = (*parent.dbChild)
 	var keys = object.GetKeys()
 	values := make([]any, len(keys))
@@ -307,7 +300,6 @@ func (parent ParentDB[T]) GetNonGeneric() []IRepository {
 func (parent *ParentDB[T]) First() T {
 	var _db = parent.DbConn()
 
-
 	// Run SELECT query
 	var keys = (*parent.dbChild).GetKeys()
 	child := *parent.dbChild
@@ -332,7 +324,7 @@ func (parent *ParentDB[T]) First() T {
 	return child
 }
 
-// 1. Definer et interface der matcher den signatur du leder efter
+// 1. Define an interface that matches the signature you are looking for
 type Loader interface {
 	Load()
 	LoadMany(parents []ISystemFields, relationkey string)
@@ -342,18 +334,18 @@ func (parent *ParentDB[T]) CheckingRelation(child T, relationkey string) {
 	childValue := reflect.ValueOf(child)
 
 	if companyMethod := childValue.MethodByName(relationkey); companyMethod.IsValid() {
-		// Kald Company() via reflection (da vi måske ikke kender typen på child)
+		// Call Company() via reflection (we may not know the type of child)
 		results := companyMethod.Call(nil)
 		if len(results) == 0 {
 			return
 		}
 
-		// 2. Tag fat i returværdien som en almindelig 'any' (interface{})
+		// 2. Take the return value as a plain 'any' (interface{})
 		rawResult := results[0].Interface()
 
-		// 3. Brug Type Assertion til at tjekke for Load-metoden
+		// 3. Use a type assertion to check for the Load method
 		if loader, ok := rawResult.(Loader); ok {
-			// 4. Kald metoden direkte (lyn hurtigt, ingen reflection her!)
+			// 4. Call the method directly (lightning fast, no reflection here!)
 			loader.Load()
 		}
 	}
@@ -364,18 +356,18 @@ func (parent *ParentDB[T]) CheckingRelationForMany(childs []ISystemFields, relat
 	childValue := reflect.ValueOf(child)
 
 	if companyMethod := childValue.MethodByName(relationkey); companyMethod.IsValid() {
-		// Kald Company() via reflection (da vi måske ikke kender typen på child)
+		// Call Company() via reflection (we may not know the type of child)
 		results := companyMethod.Call(nil)
 		if len(results) == 0 {
 			return
 		}
 
-		// 2. Tag fat i returværdien som en almindelig 'any' (interface{})
+		// 2. Take the return value as a plain 'any' (interface{})
 		rawResult := results[0].Interface()
 
-		// 3. Brug Type Assertion til at tjekke for Load-metoden
+		// 3. Use a type assertion to check for the Load method
 		if loader, ok := rawResult.(Loader); ok {
-			// 4. Kald metoden direkte (lyn hurtigt, ingen reflection her!)
+			// 4. Call the method directly (lightning fast, no reflection here!)
 			loader.LoadMany(childs, relationkey)
 		}
 	}
@@ -484,19 +476,6 @@ func (parent *ParentDB[T]) Transaction(fn func(tx *sql.Tx) error) error {
 func (parent *ParentDB[T]) WithTx(tx *sql.Tx) T {
 	parent.dbconn = tx
 	return *parent.dbChild
-}
-
-func (parent *ParentDB[T]) Pagination(r *http.Request, perPage int) map[string]any {
-	pagination := Pagination{
-		PageStr: r.URL.Query().Get("page"),
-		PerPage: perPage,
-		Path:    r.URL.Path,
-	}
-	parent.Limit(perPage)
-	parent.OffSet(pagination.AlreadySeen())
-	results := parent.Get()
-
-	return pagination.ToMap(results.ToJson())
 }
 
 func (parent *ParentDB[T]) GetCtx() context.Context {

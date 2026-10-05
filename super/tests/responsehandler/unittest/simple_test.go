@@ -74,7 +74,7 @@ func TestSimplCastingOfRealStructWithActiveRecord(t *testing.T) {
 }
 
 // Run all test in this package and below
-// go test ./tests/... // kører Alle test i mappen test.
+// go test ./tests/... // runs all tests in the tests folder.
 
-// Print kun pakker med tests: go test $(go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./internal/super/...)
-// Eller lav Alias: alias gts='go test $(go list -f "{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}" ./internal/super/...)'
+// Print only packages with tests: go test $(go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./internal/super/...)
+// Or create an alias: alias gts='go test $(go list -f "{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}" ./internal/super/...)'

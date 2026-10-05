@@ -23,7 +23,7 @@ func HasJsonFunc(v any) any {
 		return false
 	}
 	t := reflect.TypeOf(v)
-	// Hvis det er en pointer, unwrap den
+	// If it is a pointer, unwrap it
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
@@ -81,7 +81,7 @@ func GetFieldValue(fieldMeta reflect.StructField, fieldVal reflect.Value, ignore
 			return result
 		}
 
-		// For interfaces, vi caling elem, without tracking the current interface
+		// For interfaces, we call Elem without tracking the current interface
 		return GetFieldValue(fieldMeta, fieldVal.Elem(), ignore, flatten, visited)
 	}
 
@@ -97,7 +97,7 @@ func GetFieldValue(fieldMeta reflect.StructField, fieldVal reflect.Value, ignore
 	case reflect.Slice, reflect.Array:
 		var arr []any
 		for i := 0; i < fieldVal.Len(); i++ {
-			// Vi hadle visited down to each element
+			// We pass visited down to each element
 			arr = append(arr, GetFieldValue(fieldMeta, fieldVal.Index(i), ignore, flatten, visited))
 		}
 		return arr
@@ -133,7 +133,7 @@ func Struct_to_map(x reflect.Value, ignore []string, flatten []string, visited m
 
 	results := map[string]any{}
 
-	// Sørg for at vi arbejder med den faktiske struct
+	// Make sure we work with the actual struct
 	v := x
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
@@ -161,7 +161,7 @@ func Struct_to_map(x reflect.Value, ignore []string, flatten []string, visited m
 		}
 
 		fieldVal := v.Field(i)
-		// Send visited mappet videre her
+		// Pass the visited map on here
 		value := GetFieldValue(fieldMeta, fieldVal, ignore, flatten, visited)
 
 		if slices.Contains(flatten, fieldMeta.Name) {

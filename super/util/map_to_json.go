@@ -12,13 +12,13 @@ type JsonableSingle interface {
 	ToJson() map[string]any
 }
 
-// LowerFirst gør det første bogstav i en streng lille
+// LowerFirst lowercases the first letter of a string
 func LowerFirst(s string) string {
 	if s == "" {
 		return ""
 	}
 
-	// Vi konverterer til runes for at håndtere UTF-8 korrekt
+	// Convert to runes to handle UTF-8 correctly
 	r := []rune(s)
 	r[0] = unicode.ToLower(r[0])
 

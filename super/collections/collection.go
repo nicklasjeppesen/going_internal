@@ -23,3 +23,13 @@ func (c Collection[T]) ToJson() []any {
 	}
 	return finalData
 }
+
+// Reverse returns a new collection with the elements in reverse order
+// (e.g. newest-first from the database → oldest-first for display).
+func (c Collection[T]) Reverse() Collection[T] {
+	out := make(Collection[T], len(c))
+	for i, item := range c {
+		out[len(c)-1-i] = item
+	}
+	return out
+}

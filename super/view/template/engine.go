@@ -133,14 +133,14 @@ func (e *Engine) RenderComponent(name string, args ...any) (template.HTML, error
 		props[key] = args[i+1]
 	}
 
-	// 3. Render komponenten til en buffer
+	// 3. Render the component into a buffer
 	var buf bytes.Buffer
 	err := e.templates.ExecuteTemplate(&buf, name, props)
 	if err != nil {
 		return "", err
 	}
 
-	// 4. Returner som template.HTML, så Go ikke escaper vores HTML-tags
+	// 4. Return as template.HTML so Go doesn't escape our HTML tags
 	return template.HTML(buf.String()), nil
 }
 

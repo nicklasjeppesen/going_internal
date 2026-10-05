@@ -164,7 +164,7 @@ func (dbsys *SystemFields) IsEmpty() bool {
 	return dbsys.Id == 0
 }
 
-// Function for setting the table in the relation struct, so the struct knows relationee table og reation table
+// Function for setting the table in the relation struct, so the struct knows the related table and the relation table
 // ex. in the user struct, then the user table is set for them all
 func (dbsys *SystemFields) CreateRelationShip(relationshipHolder types.IRelationships) types.IRelationships {
 	return relationshipHolder
@@ -237,7 +237,7 @@ func (dbsys *SystemFields) SetRoutes(routes map[string]string) {
 	dbsys.Routes = routes
 }
 
-// Search for a value in systemholder og DBsetup
+// Search for a value in systemholder and DBsetup
 func (parent *SystemFields) GetValueholderValue(holder types.ISystemFields, key string) any {
 	if value, ok := holder.Value(key); ok != nil {
 		return value

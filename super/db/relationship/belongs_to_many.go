@@ -10,17 +10,17 @@ import (
 type BelongsToManyRelation[T IDBConnection[T]] struct {
 	pivotTable    string
 	Holder        T      // The relationship DB
-	localKey      string // Local key in foreign tabel
-	foreignKey    string // ForeignKey, ex. tabel user has company_id, then company_id foreignKey
+	localKey      string // Local key in foreign table
+	foreignKey    string // ForeignKey, e.g. table user has company_id, then company_id is the foreignKey
 	pivotsColumns []string
 	primaryId     any
 	relation      IRepository
 	callerMethod  string
 
 	QueryModifiers[T, *BelongsToManyRelation[T]]
-	wherePivots   []whereCondition // filter on pivot-tabel
-	wherePivotsIn []whereCondition // filtre on pivot-tabel
-	orderByPivots []orderCondition // sorting on pivot-tabel
+	wherePivots   []whereCondition // filter on pivot table
+	wherePivotsIn []whereCondition // filters on pivot table
+	orderByPivots []orderCondition // sorting on pivot table
 }
 
 func (belong *BelongsToManyRelation[T]) WherePivot(column string, values ...any) *BelongsToManyRelation[T] {

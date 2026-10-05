@@ -45,7 +45,7 @@ type StubDetails struct {
 func (s *StubDetails) CreateStub() {
 
 	//_, filename, _, _ := runtime.Caller(0)
-	// 'filename' er nu den absolutte sti til den .go fil, der kører koden
+	// 'filename' is now the absolute path to the .go file running the code
 	//basePath := filepath.Dir(filename)
 	//fullPath := filepath.Join(basePath, "data.txt")
 	//println(basePath)

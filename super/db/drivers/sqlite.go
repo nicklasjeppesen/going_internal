@@ -162,7 +162,7 @@ func (parent *SQLite) Save_(_db types.DBTX, columns []string, values []any, retu
 	)
 
 	if len(returningValues) == 0 {
-		// Hvis ingen RETURNING, brug Exec i stedet for QueryRow
+		// Without RETURNING, use Exec instead of QueryRow
 		if _, err := _db.ExecContext(parent.ctx, query, values...); err != nil {
 			return nil, fmt.Errorf("insert into %s: %w", parent.table, err)
 		}
@@ -465,7 +465,7 @@ func (parent *SQLite) LoadMigrationFile(basePath string, db *sql.DB) error {
 	// Running each migration
 	for _, m := range migrations {
 
-		// Check if the file already exists in the migration tabel
+		// Check if the file already exists in the migration table
 		var migrationAlreadyRun bool
 		err := db.QueryRow("SELECT EXISTS (SELECT 1 FROM migrations WHERE filename = $1)", m).Scan(&migrationAlreadyRun)
 		if err != nil {
@@ -489,7 +489,7 @@ func (parent *SQLite) LoadMigrationFile(basePath string, db *sql.DB) error {
 			return fmt.Errorf("error executing SQL in %s: %w", m, err)
 		}
 
-		// inser into the migration tabel
+		// insert into the migration table
 		_, err = db.Exec("INSERT INTO migrations (filename) VALUES ($1)", m)
 		if err != nil {
 			return fmt.Errorf("error inserting %s into migrations table: %w", m, err)

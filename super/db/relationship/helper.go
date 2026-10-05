@@ -77,7 +77,7 @@ func CallerMethodName() string {
 		return ""
 	}
 
-	// fx: "main.(*User).Company"
+	// e.g.: "main.(*User).Company"
 	full := fn.Name()
 	parts := strings.Split(full, ".")
 	return parts[len(parts)-1]

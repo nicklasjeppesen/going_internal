@@ -19,7 +19,7 @@ var (
 	configOnce sync.Once
 )
 
-// Load finder og indlæser rules.json fra projektet (singleton)
+// Load finds and loads rules.json from the project (singleton)
 func Load() (*RuleConfig, error) {
 	var loadErr error
 
@@ -66,7 +66,7 @@ func findRulesFile() (string, error) {
 	return "", fmt.Errorf("rules.json ikke fundet - forventet sti: '%s'", candidate)
 }
 
-// GetDefaultMessage returnerer default besked for et givent tag
+// GetDefaultMessage returns the default message for a given tag
 func GetDefaultMessage(tag string) (string, bool) {
 	cfg, err := Load()
 	if err != nil {
@@ -76,7 +76,7 @@ func GetDefaultMessage(tag string) (string, bool) {
 	return msg, ok
 }
 
-// GetFieldMessage returnerer specifik besked for struct.felt.regel
+// GetFieldMessage returns the specific message for struct.field.rule
 func GetFieldMessage(structName, field, tag string) (string, bool) {
 	cfg, err := Load()
 	if err != nil {

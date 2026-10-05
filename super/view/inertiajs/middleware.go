@@ -14,18 +14,18 @@ import (
 */
 func version() string {
 
-	// Sti til din Vite manifest fil
+	// Path to your Vite manifest file
 	path := "./public/.vite/manifest.json"
 
-	// Læs hele filen
+	// Read the whole file
 	data, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	// Beregn MD5 hash af indholdet
+	// Compute the MD5 hash of the content
 	hash := md5.Sum(data)
 
-	// Konverter til hex streng
+	// Convert to a hex string
 	hashStr := hex.EncodeToString(hash[:])
 	return hashStr
 }

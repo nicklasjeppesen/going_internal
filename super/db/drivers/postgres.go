@@ -371,7 +371,7 @@ func (parent *PostgresDB) Migrate(scriptpath string) error {
 		log.Fatalf("Error connecting to the database: %v", err)
 	}
 
-	// 2. Make sure the migration tabel exists
+	// 2. Make sure the migration table exists
 	_, err := db.Exec(parent.CreateMigrationTable())
 	if err != nil {
 		log.Fatalf("Error connecting to migration table: %v", err)
@@ -393,7 +393,7 @@ func (parent *PostgresDB) LoadMigrationFile(basePath string, db *sql.DB) error {
 		log.Fatalf("Could not read the folder: %v", err)
 	}
 
-	// Filtering kun *.sql
+	// Only *.sql files
 	var migrations []string
 	for _, f := range files {
 		if !f.IsDir() && strings.ToLower(filepath.Ext(f.Name())) == ".sql" {
@@ -401,7 +401,7 @@ func (parent *PostgresDB) LoadMigrationFile(basePath string, db *sql.DB) error {
 		}
 	}
 
-	// Sorts i ASC order
+	// Sorts in ASC order
 	sort.Strings(migrations)
 
 	// Run migration

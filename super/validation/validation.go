@@ -7,14 +7,14 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-// validate er den delte validator-instans for hele applikationen.
-// Registrering af custom rules sker via RegisterValidation, og skal ske
-// før serveren begynder at modtage requests.
+// validate is the shared validator instance for the whole application.
+// Custom rules are registered via RegisterValidation, which must happen
+// before the server starts receiving requests.
 var validate = validator.New()
 
-// RegisterValidation lader forbrugere (template-projekter) tilføje deres
-// egne valideringsregler. Ikke thread-safe i forhold til samtidige Validate()-kald,
-// så kald denne ved opstart, aldrig fra en handler.
+// RegisterValidation lets consumers (template projects) add their own
+// validation rules. Not thread-safe with respect to concurrent Validate() calls,
+// so call it at startup, never from a handler.
 func RegisterValidation(tag string, fn validator.Func, callEvenIfNull ...bool) error {
 	return validate.RegisterValidation(tag, fn, callEvenIfNull...)
 }
@@ -72,14 +72,14 @@ func Customvalidation[T any](v T) error {
 	return nil
 }
 
-// resolveMessage finder den mest specifikke besked via rules.json
+// resolveMessage finds the most specific message via rules.json
 func resolveMessage(structName string, fe validator.FieldError) string {
-	// 1. Tjek felt-specifik besked
+	// 1. Check for a field-specific message
 	if msg, ok := GetFieldMessage(structName, fe.StructField(), fe.Tag()); ok {
 		return replacePlaceholders(msg, fe)
 	}
 
-	// 2. Tjek default besked
+	// 2. Check for a default message
 	if msg, ok := GetDefaultMessage(fe.Tag()); ok {
 		return replacePlaceholders(msg, fe)
 	}
@@ -88,7 +88,7 @@ func resolveMessage(structName string, fe validator.FieldError) string {
 	return "Ugyldig værdi for regel '" + fe.Tag() + "'"
 }
 
-// replacePlaceholders udskifter {param} og {field} med faktiske værdier
+// replacePlaceholders replaces {param} and {field} with actual values
 func replacePlaceholders(msg string, fe validator.FieldError) string {
 	msg = strings.ReplaceAll(msg, "{param}", fe.Param())
 	msg = strings.ReplaceAll(msg, "{field}", fe.Field())

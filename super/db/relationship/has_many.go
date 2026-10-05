@@ -30,7 +30,7 @@ func (belong *HasManyRelation[T]) Save(data IRepository) error {
 	return err
 }
 
-// Set det local Key, determine by its name + "_id"
+// Set the local key, determined by its name + "_id"
 // Ex. user table might hav the column company_id, which is the foreign key
 // Sets the local key for the relationship
 func (belong *HasManyRelation[T]) ForeignKey(column string) *HasManyRelation[T] {
@@ -77,10 +77,10 @@ func (belong *HasManyRelation[T]) Items() collections.Collection[T] {
 	return nil
 }
 
-// Strategi: vi går tilbage til det som var før, men, her laver jeg en liste og et map af localids,
-// Hvor idder og selve værdier er i en map,
-// Når værdierne er fået fra get, så loppes de igennem, og tilføjes til lokale værdier og gennems på den måde.
-// Køretid: O(N * 2)
+// Strategy: build a list and a map of the local ids,
+// where the ids and the values themselves live in a map.
+// Once the values have been fetched with Get, they are looped over and attached to the local values that way.
+// Running time: O(N * 2)
 func (belong *HasManyRelation[T]) LoadMany(parents []ISystemFields, relationkey string) {
 	belong.setparent(parents[0]) // Setting Foreign key
 

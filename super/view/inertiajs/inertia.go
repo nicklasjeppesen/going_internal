@@ -29,7 +29,7 @@ func (Inertia Inertia) Back(errors ...map[string]string) func(http.ResponseWrite
 			session, _ := store.Get(r, "session-navn")
 			encodedErrors, _ := json.Marshal(errors[0])
 			session.Values["errors"] = string(encodedErrors)
-			session.Save(r, w) // Husk at gemme
+			session.Save(r, w) // Remember to save
 		}
 
 		// Set headers

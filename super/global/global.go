@@ -1,5 +1,5 @@
 // global is a general a place to store global information.
-// information that a created when start up, and only read med execution.
+// information that is created at startup, and only read during execution.
 package global
 
 // routeNameMap

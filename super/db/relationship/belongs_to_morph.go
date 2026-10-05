@@ -123,8 +123,8 @@ type EntryAble struct {
 	}
 */
 type BelongsToMorphRelation[T IRepository] struct {
-	localKey        string // Local key in foreign tabel
-	foreignKey      string // fremmed nøgle ex. tabel user has company_id, så er company_id foreignKey
+	localKey        string // Local key in foreign table
+	foreignKey      string // foreign key, e.g. table user has company_id, then company_id is the foreignKey
 	morph           string
 	relation        ISystemFields
 	relations       func(relationName string) IRepository
@@ -138,7 +138,7 @@ func (belong *BelongsToMorphRelation[T]) Attach(parent IRepository) error {
 	return nil
 }
 
-// Set det local Key, determine by its name + "_id"
+// Set the local key, determined by its name + "_id"
 // Ex. user table might hav the column company_id, which is the foreign key
 // Sets the local key for the relationship
 func (belong *BelongsToMorphRelation[T]) ForeignKey(column string) *BelongsToMorphRelation[T] {
@@ -174,7 +174,7 @@ func (belong *BelongsToMorphRelation[T]) Item() T {
 
 // 1. Create a map key: ForeignType_id, value: array of ids for this type.
 // 2. Foreach type, Call it by a get. and get its input
-// 3. Create the specicis type of them, så Get return [][] make it a user model eks.
+// 3. Create the specific type for them, so Get returns e.g. a user model
 // 4. Then find the parents with the matching type and id, get the relation by relationkey, and call its mapper function, to set the value
 func (belong *BelongsToMorphRelation[T]) LoadMany(parents []ISystemFields, relationkey string) {
 
@@ -182,7 +182,7 @@ func (belong *BelongsToMorphRelation[T]) LoadMany(parents []ISystemFields, relat
 
 	// 2. Foreach type, Call it by a get. and get its input
 	for modelName, foreignKeys := range ForeignKeysMap {
-		// 3. Create the specicis type of them, så Get return [][] make it a user model eks.
+		// 3. Create the specific type for them, so Get returns e.g. a user model
 
 		// OBS: Check for null
 		modelTemplate := belong.relations(modelName)

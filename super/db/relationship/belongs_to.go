@@ -9,8 +9,8 @@ import (
 type BelongsTo[T IDBConnection[T]] struct {
 	Holder          T // The relationship DB
 	pivotTable      string
-	localKey        string // Local key in foreign tabel
-	foreignKey      string // ForeignKey, ex. tabel user has company_id, then company_id foreignKey
+	localKey        string // Local key in foreign table
+	foreignKey      string // ForeignKey, e.g. table user has company_id, then company_id is the foreignKey
 	pivotsColumns   []string
 	primaryId       any
 	relation        ISystemFields
@@ -26,7 +26,7 @@ func (belong *BelongsTo[T]) Save(relation IRepository) error {
 	panic("Method not implemented")
 }
 
-// Set det local Key, determine by its name + "_id"
+// Set the local key, determined by its name + "_id"
 // Ex. user table might hav the column company_id, which is the foreign key
 // Sets the local key for the relationship
 func (belong *BelongsTo[T]) ForeignKey(column string) *BelongsTo[T] {
@@ -84,10 +84,10 @@ func (belong *BelongsTo[T]) Load() {
 	}
 }
 
-// Strategi: vi går tilbage til det som var før, men, her laver jeg en liste og et map af localids,
-// Hvor idder og selve værdier er i en map,
-// Når værdierne er fået fra get, så loppes de igennem, og tilføjes til lokale værdier og gennems på den måde.
-// Køretid: O(N * 2)
+// Strategy: build a list and a map of the local ids,
+// where the ids and the values themselves live in a map.
+// Once the values have been fetched with Get, they are looped over and attached to the local values that way.
+// Running time: O(N * 2)
 func (belong *BelongsTo[T]) LoadMany(parents []ISystemFields, relationkey string) {
 
 	belong.setparent(parents[0]) // Setting Foreign key

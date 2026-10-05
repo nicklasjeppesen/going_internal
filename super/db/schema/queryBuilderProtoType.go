@@ -14,8 +14,8 @@ type Column struct {
 	IsForeignKey bool
 	References   string
 	OnDelete     string
-	Precision    int // Til decimal
-	Scale        int // Til decimal
+	Precision    int // For decimal
+	Scale        int // For decimal
 }
 
 type Blueprint struct {
@@ -28,7 +28,7 @@ func (c *Column) Nullable() *Column               { c.IsNullable = true; return 
 func (c *Column) Unique() *Column                 { c.IsUnique = true; return c }
 func (c *Column) Default(val interface{}) *Column { c.DefaultValue = val; return c }
 
-// Kolonne typer
+// Column types
 func (b *Blueprint) String(name string) *Column {
 	col := &Column{Name: name, Type: "string"}
 	b.Columns = append(b.Columns, col)
@@ -77,9 +77,9 @@ func (b *Blueprint) ForeignId(name string) *Column {
 	return col
 }
 
-// Constraints og hjælpermetoder
+// Constraints and helper methods
 func (c *Column) Constrained() *Column {
-	// Simpel logik: user_id -> users table
+	// Simple logic: user_id -> users table
 	table := strings.TrimSuffix(c.Name, "_id") + "s"
 	c.IsForeignKey = true
 	c.References = table
@@ -151,15 +151,15 @@ func (g PostgresGrammar) getType(c *Column) string {
 	}
 }
 
-// SQLiteGrammar ville implementere det samme, men returnere f.eks. "INTEGER" for booleans
-// og "TEXT" for JSON, da SQLite ikke har indfødte typer til dem.
+// SQLiteGrammar would implement the same, but return e.g. "INTEGER" for booleans
+// and "TEXT" for JSON, since SQLite has no native types for them.
 
 //USAGE:
 /*
 func main() {
 	blueprint := &Blueprint{TableName: "posts"}
 
-	// Definitionen
+	// The definition
 	blueprint.String("title")
 	blueprint.String("slug").Unique()
 	blueprint.Text("excerpt")
@@ -173,7 +173,7 @@ func main() {
 	blueprint.Timestamps()
 	blueprint.SoftDeletes()
 
-	// Generer SQL til Postgres
+	// Generate SQL for Postgres
 	grammar := PostgresGrammar{}
 	fmt.Println(grammar.Compile(blueprint))
 }
@@ -204,7 +204,7 @@ func (g SQLiteGrammar) Compile(b *Blueprint) string {
 	for _, c := range b.Columns {
 		sql := fmt.Sprintf("%s %s", c.Name, g.getType(c))
 
-		// SQLite kræver PRIMARY KEY AUTOINCREMENT på selve id-kolonnen
+		// SQLite requires PRIMARY KEY AUTOINCREMENT on the id column itself
 		if c.Type == "id" {
 			sql += " PRIMARY KEY AUTOINCREMENT"
 		}
@@ -221,7 +221,7 @@ func (g SQLiteGrammar) Compile(b *Blueprint) string {
 			sql += fmt.Sprintf(" DEFAULT %v", g.formatDefault(c.DefaultValue))
 		}
 
-		// Inline Foreign Keys til SQLite
+		// Inline foreign keys for SQLite
 		if c.IsForeignKey {
 			sql += fmt.Sprintf(" REFERENCES %s(id)", c.References)
 			if c.OnDelete != "" {
@@ -242,7 +242,7 @@ func (g SQLiteGrammar) getType(c *Column) string {
 	case "string", "text", "longText", "json", "dateTime":
 		return "TEXT"
 	case "boolean":
-		return "INTEGER" // 0 eller 1
+		return "INTEGER" // 0 or 1
 	case "decimal":
 		return "NUMERIC"
 	case "foreignId":
@@ -266,7 +266,7 @@ func (g SQLiteGrammar) formatDefault(val interface{}) string {
 	}
 }
 
-// Simpler example that work!
+// Simpler example that works!
 /*
 // You can edit this code!
 // Click here and start typing.
@@ -277,13 +277,13 @@ import (
 	"strings"
 )
 
-// Column repræsenterer en database-kolonne
+// Column represents a database column
 type Column struct {
 	Name string
 	Type string
 }
 
-// Blueprint holder styr på alle kolonner for en tabel
+// Blueprint keeps track of all columns for a table
 type Blueprint struct {
 	TableName string
 	Columns   []Column
@@ -310,10 +310,10 @@ type Schema struct{}
 func (s Schema) Create(tableName string, callback func(table *Blueprint)) {
 	blueprint := &Blueprint{TableName: tableName}
 
-	// Her køres callback-funktionen (ligesom Closure i Laravel)
+	// The callback runs here (like a Closure in Laravel)
 	callback(blueprint)
 
-	// Generer SQL
+	// Generate SQL
 	var cols []string
 	for _, col := range blueprint.Columns {
 		cols = append(cols, fmt.Sprintf("%s %s", col.Name, col.Type))
@@ -324,7 +324,7 @@ func (s Schema) Create(tableName string, callback func(table *Blueprint)) {
 		strings.Join(cols, ",\n  "),
 	)
 
-	// I en rigtig app ville du køre db.Exec(sql) her
+	// In a real app you would run db.Exec(sql) here
 	fmt.Println(sql)
 }
 
