@@ -80,9 +80,21 @@ func (router *MyRouter) rootRouter() *MyRouter {
 func (router *MyRouter) Group(prefix string) *MyRouter {
 	return &MyRouter{
 		prefix:      router.prefix + prefix,
-		middlewares: append([]middlewarestdlib.Middleware{}, router.middlewares...),
+		middlewares: router.inheritedMiddlewares(),
 		root:        router.rootRouter(),
 	}
+}
+
+// inheritedMiddlewares are the middlewares a route or sub-group registered
+// through this router gets. The root router's own middlewares are left out:
+// RegisterRoutes wraps every route in them, so copying them here as well would
+// run them twice (e.g. CSRF) – no matter whether they were added before or after
+// the groups and routes were created.
+func (router *MyRouter) inheritedMiddlewares() []middlewarestdlib.Middleware {
+	if router.root == nil {
+		return nil
+	}
+	return append([]middlewarestdlib.Middleware{}, router.middlewares...)
 }
 
 // Middleware appends one or more middlewares to this router/group. Every route
@@ -147,7 +159,7 @@ func (router *MyRouter) dispatch(httpType, path string, handlerOrController inte
 		path:       router.prefix + path,
 		httpType:   httpType,
 		handler:    modifier,
-		middleware: append([]middlewarestdlib.Middleware{}, router.middlewares...),
+		middleware: router.inheritedMiddlewares(),
 	}
 
 	root.Handlers = append(root.Handlers, newRoute)
@@ -230,7 +242,7 @@ func (router *MyRouter) httpHandler(HTTPType string, path string, handler interf
 		path:       router.prefix + path,
 		httpType:   HTTPType,
 		handler:    routeHandler(handler),
-		middleware: append([]middlewarestdlib.Middleware{}, router.middlewares...),
+		middleware: router.inheritedMiddlewares(),
 	}
 
 	root.Handlers = append(root.Handlers, newRoute)
@@ -247,7 +259,7 @@ func (router *MyRouter) rawHandler(HTTPType string, path string, handler request
 		path:       router.prefix + path,
 		httpType:   HTTPType,
 		handler:    handler,
-		middleware: append([]middlewarestdlib.Middleware{}, router.middlewares...),
+		middleware: router.inheritedMiddlewares(),
 	}
 
 	root.Handlers = append(root.Handlers, newRoute)

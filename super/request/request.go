@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	auth "github.com/nicklasjeppesen/going_internal/super/auth"
 	. "github.com/nicklasjeppesen/going_internal/super/result"
@@ -45,6 +46,33 @@ func (r *Requestbase) Validate(body interface{}) (bool, map[string][]string) {
 
 func (r *Requestbase) FormValue(key string) string {
 	return r.R.FormValue(key)
+}
+
+// Param is the route parameter key ({key} in the route), or else ?key=… in the
+// URL ("" when neither is set) – like Rails' params[:key] for GET values. Form
+// and JSON bodies are read with RequestBody[T].
+//
+//	kind := request.Param("kind")     // /chats/5/files?kind=images → "images"
+//	letter := request.Param("letter") // /people/letters/{letter}   → "A"
+func (r *Requestbase) Param(key string) string {
+	if v := r.R.PathValue(key); v != "" {
+		return v
+	}
+	return r.R.URL.Query().Get(key)
+}
+
+// ParamInt is Param as a number: 0 when it is missing or not a number.
+//
+//	offset := request.ParamInt("offset") // ?offset=20 → 20
+func (r *Requestbase) ParamInt(key string) int {
+	n, _ := strconv.Atoi(r.Param(key))
+	return n
+}
+
+// ParamInt64 is Param as an int64 (e.g. ids): 0 when it is missing or not a number.
+func (r *Requestbase) ParamInt64(key string) int64 {
+	n, _ := strconv.ParseInt(r.Param(key), 10, 64)
+	return n
 }
 
 func (r *Requestbase) GetInputs() map[string]string {
