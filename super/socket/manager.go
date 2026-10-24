@@ -4,7 +4,9 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"sync"
 
 	auth "github.com/nicklasjeppesen/going_internal/super/auth"
@@ -65,16 +67,36 @@ var (
 	ErrEventNotSupported = errors.New("this event type is not supported")
 )
 
-// Check origin and return true if its allowed
+// checkOrigin decides whether a websocket upgrade is allowed. A browser always
+// sends Origin; it is accepted when it is the same origin as the request
+// (Origin host == Host header), or when it equals the configured APP_URL (with
+// or without APP_PORT).
+//
+// The same-origin rule is what makes the app work behind a reverse proxy that
+// terminates TLS (Caddy, Vibe Deploy): the app listens on e.g. :8080, but the
+// browser is on https://app.example.com (port 443, so no port in Origin), and
+// the proxy keeps the Host header. A page on another site can never pass,
+// because its Origin host differs from Host.
+//
+// Requests without Origin (not from a browser) are rejected.
 func checkOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return false
+	}
 
-	// Get the URL where the request is coming from
-	RecivedRequest := r.Header.Get("Origin")
+	appURL := strings.TrimRight(os.Getenv(constants.APP_URL), "/")
+	if appURL != "" {
+		if origin == appURL || origin == appURL+":"+os.Getenv(constants.APP_PORT) {
+			return true
+		}
+	}
 
-	var host = os.Getenv(constants.APP_URL)
-	var port = os.Getenv(constants.APP_PORT)
-	var appUrl = host + ":" + port
-	return RecivedRequest == appUrl
+	u, err := url.Parse(origin)
+	if err != nil || u.Host == "" {
+		return false
+	}
+	return strings.EqualFold(u.Host, r.Host)
 }
 
 // serveWS is a HTTP Handler that the has the Manager that allows connections
