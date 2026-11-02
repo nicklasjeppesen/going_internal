@@ -44,6 +44,15 @@ func TestCsrfMultipart(t *testing.T) {
 	}
 }
 
+func TestCsrfQueryIsSafe(t *testing.T) {
+	r := httptest.NewRequest("QUERY", "/search", strings.NewReader(`{}`))
+	r.Header.Set("Content-Type", "application/json")
+
+	if got := csrfServe(r, 1<<20); got != http.StatusOK {
+		t.Errorf("QUERY without a token: %d, want 200", got)
+	}
+}
+
 func TestCsrfJSONTooLarge(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"csrf_token":"good","x":"`+strings.Repeat("a", 2<<20)+`"}`))
 	r.Header.Set("Content-Type", "application/json")

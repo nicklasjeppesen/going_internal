@@ -45,6 +45,9 @@ func (r *Requestbase) Validate(body interface{}) (bool, map[string][]string) {
 }
 
 func (r *Requestbase) FormValue(key string) string {
+	if err := parseQueryForm(r.R); err != nil {
+		return ""
+	}
 	return r.R.FormValue(key)
 }
 
@@ -76,6 +79,8 @@ func (r *Requestbase) ParamInt64(key string) int64 {
 }
 
 func (r *Requestbase) GetInputs() map[string]string {
+	_ = parseQueryForm(r.R)
+
 	data := make(map[string]string)
 
 	for key, values := range r.R.Form {

@@ -30,10 +30,21 @@ type Input struct {
 	Csrf_token string `json:"csrf_token"`
 }
 
+// isSafeMethod reports whether method is safe (read-only) per RFC 9110 and the
+// QUERY method draft. Safe requests get a CSRF token but never have to submit
+// one, since they cannot change state.
+func isSafeMethod(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions, "QUERY":
+		return true
+	}
+	return false
+}
+
 func CsrfMiddleware(next request.Handler) request.Handler {
 	return func(req *request.Requestbase) {
 
-		if req.R.Method == http.MethodGet {
+		if isSafeMethod(req.R.Method) {
 
 			cookie, err := req.R.Cookie(constants.Csrf_token)
 

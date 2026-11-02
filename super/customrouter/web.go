@@ -142,6 +142,13 @@ func (router *MyRouter) Options(path string, handlerOrController interface{}, me
 	return router.dispatch("OPTIONS", path, handlerOrController, methodName...)
 }
 
+// Query registers a QUERY route. QUERY is a safe, idempotent method like GET,
+// but unlike GET it may carry a request body, which makes it suitable for
+// complex searches that do not fit in a URL.
+func (router *MyRouter) Query(path string, handlerOrController interface{}, methodName ...string) *Route {
+	return router.dispatch("QUERY", path, handlerOrController, methodName...)
+}
+
 // dispatch builds the right Modifier (plain handler vs. resolved controller
 // action with DI + before/after hooks) and registers it as a Route.
 func (router *MyRouter) dispatch(httpType, path string, handlerOrController interface{}, methodName ...string) *Route {
@@ -196,13 +203,18 @@ func (router *MyRouter) HandleOptions(path string, handler request.Handler) *Rou
 	return router.rawHandler("OPTIONS", path, handler)
 }
 
+// HandleQuery registers a QUERY route with a plain http.HandlerFunc.
+func (router *MyRouter) HandleQuery(path string, handler request.Handler) *Route {
+	return router.rawHandler("QUERY", path, handler)
+}
+
 // Route represents a registered HTTP endpoint with its layout, method, handler,
 type Route struct {
 	// Index: position in the webrouter list
 	index int
 	// path: Current URL path (already includes any Group()/Addprefix() prefixes)
 	path string
-	// HTTPType: define if it a GET, POST, PUT, DELETE, PATCH or OPTIONS
+	// HTTPType: define if it a GET, POST, PUT, DELETE, PATCH, OPTIONS or QUERY
 	httpType string
 
 	// name of the URL
@@ -398,7 +410,7 @@ func (router *MyRouter) RegisterRoutes(r *http.ServeMux) {
 		var RouterMiddleware = router.middlewares
 
 		switch route.httpType {
-		case "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS":
+		case "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "QUERY":
 			r.HandleFunc(route.httpType+" "+route.path, chain(chain(handler, middlewares), RouterMiddleware))
 		default:
 			log.Printf("Unsupported HTTP method: %s\n", route.httpType)

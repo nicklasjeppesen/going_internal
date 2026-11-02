@@ -1,8 +1,10 @@
 package customrouter
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	middlewarestdlib "github.com/nicklasjeppesen/going_internal/super/middleware"
@@ -55,6 +57,36 @@ func TestRootMiddlewareRunsOnce(t *testing.T) {
 	}
 	if before != 1 || after != 1 || group != 1 {
 		t.Fatalf("/g/x: root ran %d/%d times (want 1/1), group %d (want 1)", before, after, group)
+	}
+}
+
+// QUERY routes are registered with the QUERY method and receive their body,
+// which is the reason the method exists.
+func TestQueryRoute(t *testing.T) {
+	root := NewMyRouter()
+	root.Query("/search", func(r request.Requestbase) {
+		r.W.WriteHeader(http.StatusOK)
+		r.W.Write([]byte(r.R.Method))
+	})
+	root.HandleQuery("/raw", func(r *request.Requestbase) {
+		body, _ := io.ReadAll(r.R.Body)
+		r.W.WriteHeader(http.StatusCreated)
+		r.W.Write(body)
+	})
+
+	mux := http.NewServeMux()
+	root.RegisterRoutes(mux)
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest("QUERY", "/search", nil))
+	if rec.Code != http.StatusOK || rec.Body.String() != "QUERY" {
+		t.Fatalf("Query: status %d, body %q", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest("QUERY", "/raw", strings.NewReader("hello")))
+	if rec.Code != http.StatusCreated || rec.Body.String() != "hello" {
+		t.Fatalf("HandleQuery: status %d, body %q", rec.Code, rec.Body.String())
 	}
 }
 
