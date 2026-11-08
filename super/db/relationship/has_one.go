@@ -13,6 +13,7 @@ type HasOneRelation[T IDB[T]] struct {
 	relation        ISystemFields
 	relationToEntiy IRepository
 	callerMeethod   string
+	QueryModifiers[T, *HasOneRelation[T]]
 }
 
 func (belong *HasOneRelation[T]) Save(data IRepository) error {
@@ -28,13 +29,13 @@ func (belong *HasOneRelation[T]) GetHolder() ISystemFields {
 // Set the local key, determined by its name + "_id"
 // Ex. user table might hav the column company_id, which is the foreign key
 // Sets the local key for the relationship
-func (belong *HasOneRelation[T]) ForeignKey(column string) IRelationship {
+func (belong *HasOneRelation[T]) ForeignKey(column string) *HasOneRelation[T] {
 	belong.foreignKey = column
 	return belong
 }
 
 // Asume a table follow the convension of id as primary key, if other key is used, then set it here
-func (belong *HasOneRelation[T]) LocalKey(column string) IRelationship {
+func (belong *HasOneRelation[T]) LocalKey(column string) *HasOneRelation[T] {
 	belong.localKey = column
 	return belong
 }
@@ -68,7 +69,11 @@ func (belong *HasOneRelation[T]) Load() {
 	if localKeyValue == nil {
 		return
 	}
-	first := belong.Holder.Where(belong.foreignKey, localKeyValue).First()
+	//first := belong.Holder.Where(belong.foreignKey, localKeyValue).First()
+	query := belong.Holder.Where(belong.foreignKey, localKeyValue)
+	query = belong.Apply(query)
+	first := query.First()
+
 	belong.relationToEntiy.SetRelationshipHolder(belong.callerMeethod, first)
 
 }
