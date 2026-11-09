@@ -20,27 +20,25 @@ func (belong *HasManyMorphRelation[T]) Attach(data T) error {
 
 	data = data.DB(belong.Holder.GetCtx())
 
-	// Set relation type id
-	foreignId := belong.morph + "_id"
-	key := belong.relationToEntiy.PrimaryKey()
-	data.SetValue(foreignId, key)
-
-	// Set foreign relation type key
-	foreignName := belong.morph + "_type"
-	foreignType := belong.relationToEntiy.GetName()
-	data.SetValue(foreignName, foreignType)
-
-	// Save record
-	_, err := data.SaveNonGenerics()
-	return err
-
+	return belong.Save(data)
 }
 
+// Save saves data as one of the parent's morph children: <morph>_id gets the
+// parent's local key (normally its id) and <morph>_type the parent's name,
+// the same columns Load reads.
 func (belong *HasManyMorphRelation[T]) Save(data IRepository) error {
-	data.SetValue(belong.foreignKey, belong.Holder.PrimaryKey())
-	_, err := data.SaveNonGenerics()
+	key, err := parentKey(belong.relationToEntiy, belong.localKey)
+	if err != nil {
+		return err
+	}
+	if err := data.SetValue(belong.morph+"_id", key); err != nil {
+		return err
+	}
+	if err := data.SetValue(belong.morph+"_type", belong.relationToEntiy.GetName()); err != nil {
+		return err
+	}
+	_, err = data.SaveNonGenerics()
 	return err
-
 }
 
 // Set the local key, determined by its name + "_id"

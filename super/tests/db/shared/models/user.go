@@ -5,6 +5,7 @@ import (
 
 	. "github.com/nicklasjeppesen/going_internal/super/db"
 	drivers "github.com/nicklasjeppesen/going_internal/super/db/drivers"
+	relations "github.com/nicklasjeppesen/going_internal/super/db/relationship"
 	. "github.com/nicklasjeppesen/going_internal/super/db/types"
 )
 
@@ -26,4 +27,19 @@ func (_user User) DB(ctx context.Context) *User {
 	}
 	u.ParentDB = CreateORMWithCustomDB(ctx, u, DBCreator{Driver: drivers.CreateSQLite(ctx).Driver, ConnectionString: "./testdb.db"})
 	return u
+}
+
+// Posts are the user's posts (posts.user_id).
+func (u *User) Posts() *relations.HasManyRelation[*Post] {
+	return u.HasMany(Post{}.DB(u.GetCtx()))
+}
+
+// Post is one of the user's posts (posts.user_id).
+func (u *User) Post() *relations.HasOneRelation[*Post] {
+	return u.HasOne(Post{}.DB(u.GetCtx()))
+}
+
+// Comments are the user's comments (commentable_type = "user").
+func (u *User) Comments() *relations.HasManyMorphRelation[*Comment] {
+	return u.HasManyMorph(Comment{}.DB(u.GetCtx()))
 }

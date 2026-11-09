@@ -15,18 +15,24 @@ type HasManyRelation[T IDB[T]] struct {
 	QueryModifiers[T, *HasManyRelation[T]]
 }
 
+// Attach saves data as a child of the parent: its foreign key gets the
+// parent's local key (normally its id).
 func (belong *HasManyRelation[T]) Attach(data IRepository) error {
-
-	data.SetValue(belong.foreignKey, belong.Holder.PrimaryKey())
-	_, err := data.SaveNonGenerics()
-	return err
-
+	return belong.Save(data)
 }
 
+// Save saves data as a child of the parent: its foreign key gets the
+// parent's local key (normally its id).
 func (belong *HasManyRelation[T]) Save(data IRepository) error {
-
-	data.SetValue(belong.foreignKey, belong.relationToEntiy.PrimaryKey())
-	_, err := data.SaveNonGenerics()
+	belong.setparent(belong.relationToEntiy)
+	key, err := parentKey(belong.relationToEntiy, belong.localKey)
+	if err != nil {
+		return err
+	}
+	if err := data.SetValue(belong.foreignKey, key); err != nil {
+		return err
+	}
+	_, err = data.SaveNonGenerics()
 	return err
 }
 

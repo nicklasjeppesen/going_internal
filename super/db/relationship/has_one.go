@@ -16,9 +16,18 @@ type HasOneRelation[T IDB[T]] struct {
 	QueryModifiers[T, *HasOneRelation[T]]
 }
 
+// Save saves data as the parent's child: its foreign key gets the parent's
+// local key (normally its id).
 func (belong *HasOneRelation[T]) Save(data IRepository) error {
-	data.SetValue(belong.foreignKey, belong.Holder.PrimaryKey())
-	_, err := data.SaveNonGenerics()
+	belong.setparent(belong.relationToEntiy)
+	key, err := parentKey(belong.relationToEntiy, belong.localKey)
+	if err != nil {
+		return err
+	}
+	if err := data.SetValue(belong.foreignKey, key); err != nil {
+		return err
+	}
+	_, err = data.SaveNonGenerics()
 	return err
 }
 

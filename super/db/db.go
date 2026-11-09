@@ -13,6 +13,7 @@ import (
 	drivers "github.com/nicklasjeppesen/going_internal/super/db/drivers"
 	relations "github.com/nicklasjeppesen/going_internal/super/db/relationship"
 	. "github.com/nicklasjeppesen/going_internal/super/db/types"
+	"github.com/nicklasjeppesen/going_internal/super/events"
 	global "github.com/nicklasjeppesen/going_internal/super/global"
 	struct_to_map "github.com/nicklasjeppesen/going_internal/super/util"
 )
@@ -20,6 +21,10 @@ import (
 type ActiveRecord[T IDB[T]] struct {
 	*ParentDB[T]
 	SystemFields
+
+	// recordedEvents are the domain events recorded with Record and not yet
+	// released (see events.go). Unexported, so never a column or in ToJson.
+	recordedEvents []events.Event
 }
 
 func (activerecord *ActiveRecord[T]) BelongsTo[U IDBConnection[U]](relationFrom U) *relations.BelongsTo[U] {
@@ -312,6 +317,7 @@ func (parent *ParentDB[T]) First() T {
 	}
 
 	child.AddDBVal(keys, syskeys, values)
+	loadedRow(child)
 
 	for _, relation := range parent.with {
 		parent.CheckingRelation(child, relation)
@@ -390,6 +396,7 @@ func (parent *ParentDB[T]) Get() Collection[T] {
 
 		var object = (*parent.dbChild).DB(parent.ctx)
 		object.AddDBVal(keys, syskeys, values)
+		loadedRow(object)
 		result[i] = object
 		mylist = append(mylist, object)
 	}

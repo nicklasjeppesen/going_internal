@@ -57,8 +57,7 @@ func NewApp() *App {
 func (app App) RegisterCustomRules(rules map[string]func(fl validator.FieldLevel) bool) {
 	for tag, fn := range rules {
 		if err := validation.RegisterValidation(tag, fn); err != nil {
-			fmt.Errorf("failed to register validation rule %q: %w", tag, err)
-			panic(err)
+			panic(fmt.Errorf("failed to register validation rule %q: %w", tag, err))
 		}
 	}
 }

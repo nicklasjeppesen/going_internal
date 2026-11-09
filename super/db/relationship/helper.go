@@ -1,6 +1,7 @@
 package relationship
 
 import (
+	"fmt"
 	"reflect"
 	"runtime"
 	"strings"
@@ -41,6 +42,23 @@ func relationLoader(child any, relationkey string) Loader {
 		return nil
 	}
 	return loader
+}
+
+// parentKey returns the parent's value for localKey (normally "id"), which a
+// child gets as its foreign key. Holder is the empty child prototype the
+// relation was built with, so the id must never be taken from there.
+func parentKey(parent ISystemFields, localKey string) (any, error) {
+	if localKey == "" {
+		localKey = parent.PrimaryKeyName()
+	}
+	value, err := parent.Value(localKey)
+	if err != nil {
+		return nil, fmt.Errorf("relationship: parent has no column %q: %w", localKey, err)
+	}
+	if value == nil {
+		return nil, fmt.Errorf("relationship: parent's %q is empty", localKey)
+	}
+	return value, nil
 }
 
 func removeTrailingS(input string) string {
