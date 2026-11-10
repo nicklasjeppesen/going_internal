@@ -182,11 +182,18 @@ func (parent *ParentDB[T]) With(relation ...string) T {
 	return *parent.dbChild
 }
 
+// DbConn is what the model's queries run on: the connection set with
+// WithTx/SetDbConn, else the transaction in the model's context (see
+// Transaction) when it is on the same database, else the shared pool.
 func (parent *ParentDB[T]) DbConn() DBTX {
 	if parent.dbconn != nil {
 		return parent.dbconn
 	}
-	return parent.creator.Driver.Open(parent.creator.ConnectionString)
+	pool := parent.creator.Driver.Open(parent.creator.ConnectionString)
+	if tx := ctxTx(parent.ctx, pool); tx != nil {
+		return tx
+	}
+	return pool
 }
 
 func (parent *ParentDB[T]) SetDbConn(conn DBTX) {
@@ -442,40 +449,23 @@ func (parent *ParentDB[T]) Delete() error {
 	return parent.creator.Driver.Delete_(_db, primaryKey)
 }
 
-/*
-* Transaction begins a database transaction, executes the provided function,
-* and commits on success or rolls back on error/panic.
-* The *sql.Tx is passed to the callback so it can be used for raw SQL
-* or passed to other models via SetDbConn()/WithTx().
-* The parent model's connection is automatically set to the transaction.
- */
+// Transaction runs fn in a transaction and hands it the *sql.Tx; the model's
+// own connection is set to the tx while fn runs. It is db.Transaction on the
+// model's database with the model's context: inside a transaction that
+// context already carries, fn joins it, and only the outermost one commits or
+// rolls back (an error, or a panic, rolls back).
+//
+// Deprecated: use db.Transaction(ctx, fn). Models made with DB(ctx) inside fn
+// join the transaction without WithTx, and raw SQL runs on db.Conn(ctx).
 func (parent *ParentDB[T]) Transaction(fn func(tx *sql.Tx) error) error {
-	conn := parent.creator.Driver.Open(parent.creator.ConnectionString) // shared pool
-	tx, err := conn.Begin()
-	if err != nil {
-		return err
-	}
-
-	oldDbconn := parent.dbconn
-	parent.dbconn = tx
-
-	defer func() {
-		parent.dbconn = oldDbconn
-	}()
-
-	defer func() {
-		if p := recover(); p != nil {
-			tx.Rollback()
-			panic(p)
-		}
-	}()
-
-	if err := fn(tx); err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	return tx.Commit()
+	pool := parent.creator.Driver.Open(parent.creator.ConnectionString) // shared pool
+	return transactionOn(parent.ctx, pool, func(ctx context.Context) error {
+		tx := TxFrom(ctx)
+		old := parent.dbconn
+		parent.dbconn = tx
+		defer func() { parent.dbconn = old }()
+		return fn(tx)
+	})
 }
 
 // WithTx sets a transaction on the model and returns it for chaining.

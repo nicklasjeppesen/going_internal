@@ -30,6 +30,10 @@ const Wildcard = "*"
 // already been shut down.
 var ErrShutdown = errors.New("events: dispatcher is shutting down")
 
+// ErrNoListener is wrapped by the error Deliver returns when the event has no
+// listener with the given name.
+var ErrNoListener = errors.New("events: no listener with that name")
+
 // Event is the contract every domain event must fulfill.
 //
 // The name is the routing key the dispatcher uses to find the listeners, so

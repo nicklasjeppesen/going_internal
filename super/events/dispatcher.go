@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"reflect"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -40,6 +42,10 @@ type Dispatcher struct {
 	mu        sync.RWMutex
 	listeners map[string][]registration
 
+	// types is the Go type of each event name, learned from the typed
+	// listeners (On, ListenTo), guarded by mu.
+	types map[string]reflect.Type
+
 	// closed flips to true as soon as Shutdown starts, so no new event is
 	// accepted after that point.
 	closed atomic.Bool
@@ -50,6 +56,9 @@ type Dispatcher struct {
 
 	// onError receives every error an asynchronous listener returns.
 	onError func(error)
+
+	// resolver resolves the parameters of listener factories (WithResolver).
+	resolver Resolver
 
 	// failures collects the errors of the asynchronous listeners, guarded
 	// by failureMu.
@@ -65,6 +74,23 @@ type delivery struct {
 
 // Option customises a dispatcher while it is created.
 type Option func(*Dispatcher)
+
+// Resolver resolves a value by its type, like a DI container
+// (customrouter.Container fulfils it). It is false when nothing is
+// registered for t.
+type Resolver interface {
+	Resolve(t reflect.Type) (reflect.Value, bool)
+}
+
+// WithResolver lets On take listener factories: funcs whose parameters are
+// resolved through r and that return the listener (see On).
+//
+//	dispatcher := events.New(events.WithResolver(container))
+func WithResolver(r Resolver) Option {
+	return func(dispatcher *Dispatcher) {
+		dispatcher.resolver = r
+	}
+}
 
 // WithWorkers sets how many listeners may handle events at the same time.
 // Values below one keep the default.
@@ -105,6 +131,7 @@ func WithErrorHandler(handler func(error)) Option {
 func New(options ...Option) *Dispatcher {
 	dispatcher := &Dispatcher{
 		listeners:   make(map[string][]registration),
+		types:       make(map[string]reflect.Type),
 		stop:        make(chan struct{}),
 		workerCount: defaultWorkers,
 		bufferSize:  defaultBuffer,
@@ -137,17 +164,78 @@ func (dispatcher *Dispatcher) Listen(name string, handler Handler) {
 }
 
 // register stores a handler together with the way it wants to be called.
+//
+// It panics when a named listener has an empty name or would share its name
+// with another listener of the same event (see Name).
 func (dispatcher *Dispatcher) register(name string, entry registration) {
 	dispatcher.mu.Lock()
 	defer dispatcher.mu.Unlock()
 
+	if entry.named {
+		if err := dispatcher.checkName(name, entry.name); err != nil {
+			panic(err)
+		}
+	}
+	if entry.eventType != nil {
+		if known, ok := dispatcher.types[name]; ok && known != entry.eventType {
+			panic(fmt.Errorf("events: %q is already the name of %v, not of %v", name, known, entry.eventType))
+		}
+		dispatcher.types[name] = entry.eventType
+	}
+
 	dispatcher.listeners[name] = append(dispatcher.listeners[name], entry)
 }
 
+// EventType is the Go type of the events published under name, learned when a
+// typed listener (On, ListenTo) was registered for it. False when no typed
+// listener has been registered for the name (Listen and ListenAll don't know
+// the type).
+//
+// An outbox uses it to decode a stored event back into its own type.
+func (dispatcher *Dispatcher) EventType(name string) (reflect.Type, bool) {
+	dispatcher.mu.RLock()
+	defer dispatcher.mu.RUnlock()
+
+	typ, ok := dispatcher.types[name]
+	return typ, ok
+}
+
+// checkName reports an error when listenerName can't be used for a listener
+// of eventName: it is empty, or another listener of the same event already
+// has it. A wildcard listener is part of every event, so its name is checked
+// against all of them. The caller holds mu.
+func (dispatcher *Dispatcher) checkName(eventName, listenerName string) error {
+	if listenerName == "" {
+		return fmt.Errorf("events: a listener for %q was given an empty name", eventName)
+	}
+
+	var lists = []string{eventName, Wildcard}
+	if eventName == Wildcard {
+		lists = slices.Sorted(maps.Keys(dispatcher.listeners))
+	}
+
+	for _, list := range lists {
+		for _, existing := range dispatcher.listeners[list] {
+			if existing.name == listenerName {
+				return fmt.Errorf("events: the listener name %q is already used for %q", listenerName, list)
+			}
+		}
+	}
+
+	return nil
+}
+
 // ListenAll registers a handler that is called for every published event,
-// no matter its name.
-func (dispatcher *Dispatcher) ListenAll(handler Handler) {
-	dispatcher.Listen(Wildcard, handler)
+// no matter its name. Like Listen it follows the caller; pass Async to always
+// run it on the worker pool, and Name to give it a stable name (a named
+// wildcard listener is listed and delivered for every event).
+func (dispatcher *Dispatcher) ListenAll(handler Handler, options ...ListenOption) {
+	var entry = registration{handler: handler, mode: modeFollowCaller}
+	for _, option := range options {
+		option(&entry)
+	}
+
+	dispatcher.register(Wildcard, entry)
 }
 
 // ListenTo registers a handler that receives the event as its own type.
@@ -160,20 +248,35 @@ func (dispatcher *Dispatcher) ListenAll(handler Handler) {
 //		return nil
 //	})
 //
+// Pass Name to give it a stable name (see Deliver). Without Async it follows
+// the caller like Listen; with Async it always runs on the worker pool for
+// Publish, like On.
+//
 // It is a function and not a method on the Dispatcher, because Go does not
 // allow a method to declare its own type parameters.
-func ListenTo[T Event](dispatcher *Dispatcher, handler func(ctx context.Context, event T) error) {
+func ListenTo[T Event](dispatcher *Dispatcher, handler func(ctx context.Context, event T) error, options ...ListenOption) {
 	var prototype T
 	var name = prototype.EventName()
 
-	dispatcher.Listen(name, func(ctx context.Context, event Event) error {
-		typed, ok := event.(T)
-		if !ok {
-			return fmt.Errorf("listener for %q expected %T, received %T", name, prototype, event)
-		}
+	var entry = registration{
+		mode:      modeFollowCaller,
+		eventType: concreteType[T](),
+		handler: func(ctx context.Context, event Event) error {
+			typed, ok := event.(T)
+			if !ok {
+				return fmt.Errorf("listener for %q expected %T, received %T", name, prototype, event)
+			}
 
-		return handler(ctx, typed)
-	})
+			return handler(ctx, typed)
+		},
+	}
+
+	entry.nameAfter(handler)
+	for _, option := range options {
+		option(&entry)
+	}
+
+	dispatcher.register(name, entry)
 }
 
 // Forget drops every handler registered for name, which mostly helps when a
@@ -183,6 +286,7 @@ func (dispatcher *Dispatcher) Forget(name string) {
 	defer dispatcher.mu.Unlock()
 
 	delete(dispatcher.listeners, name)
+	delete(dispatcher.types, name)
 }
 
 // HasListeners reports whether anything is listening for name.
@@ -307,6 +411,79 @@ func (dispatcher *Dispatcher) enqueue(ctx context.Context, event Event) error {
 // its own, for example with context.WithTimeout inside the listener.
 func (dispatcher *Dispatcher) PublishDetached(ctx context.Context, event Event) error {
 	return dispatcher.Publish(context.WithoutCancel(ctx), event)
+}
+
+// Listeners returns the named listeners of the event, in the order they were
+// registered: the event's own first, then the named listeners for every event
+// (Wildcard). Unnamed listeners are left out.
+//
+// An app that delivers to one listener at a time uses it to know which
+// deliveries an event needs, for example one outbox row per listener.
+func (dispatcher *Dispatcher) Listeners(event Event) []ListenerInfo {
+	dispatcher.mu.RLock()
+	defer dispatcher.mu.RUnlock()
+
+	var name = event.EventName()
+	var infos []ListenerInfo
+
+	for _, list := range [][]registration{dispatcher.listeners[name], dispatcher.listeners[Wildcard]} {
+		for _, entry := range list {
+			if entry.named {
+				infos = append(infos, ListenerInfo{Name: entry.name, Async: entry.mode == modeAsync})
+			}
+		}
+	}
+
+	return infos
+}
+
+// Deliver runs only the listener called name for the event, inline in the
+// calling goroutine whatever its mode, and returns its error. A panic is
+// recovered and returned as an error.
+//
+// It is the building block for retrying one side effect at a time: when an
+// app stores a delivery per listener, a failing mail is retried without
+// running the activity log again. Publish, PublishDetached and Dispatch are
+// not affected and still run every listener.
+//
+// The error wraps ErrNoListener when the event has no listener with that
+// name, and is ErrShutdown after Shutdown.
+func (dispatcher *Dispatcher) Deliver(ctx context.Context, event Event, name string) error {
+	if dispatcher.closed.Load() {
+		return ErrShutdown
+	}
+
+	handler, ok := dispatcher.namedHandler(event, name)
+	if !ok {
+		return fmt.Errorf("events: %q has no listener called %q: %w", event.EventName(), name, ErrNoListener)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("events: listener %q for %q was not called: %w", name, event.EventName(), err)
+	}
+
+	if err := invoke(ctx, event, handler); err != nil {
+		return fmt.Errorf("events: listener %q for %q failed: %w", name, event.EventName(), err)
+	}
+
+	return nil
+}
+
+// namedHandler finds the listener called name among the event's listeners and
+// the ones for every event.
+func (dispatcher *Dispatcher) namedHandler(event Event, name string) (Handler, bool) {
+	dispatcher.mu.RLock()
+	defer dispatcher.mu.RUnlock()
+
+	for _, list := range [][]registration{dispatcher.listeners[event.EventName()], dispatcher.listeners[Wildcard]} {
+		for _, entry := range list {
+			if entry.named && entry.name == name {
+				return entry.handler, true
+			}
+		}
+	}
+
+	return nil, false
 }
 
 // Failures returns the errors collected from the asynchronous handlers.
