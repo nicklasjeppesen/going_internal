@@ -37,6 +37,7 @@ type IParent[T IRepository] interface {
 	OrderBy(column string) T
 	LockForUpdate() T
 	SharedLock() T
+	CountBy(column string) (map[any]int64, error)
 }
 
 /*
@@ -111,6 +112,9 @@ type ISystemFields interface {
 	SetRelationshipHolder(key string, value any)
 
 	GetRelationshipHolder(key string) []any
+
+	// SetRelationCount stores the count WithCount loaded for a relation.
+	SetRelationCount(key string, n int64)
 
 	Any() bool
 }

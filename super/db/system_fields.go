@@ -19,6 +19,7 @@ type SystemFields struct {
 	Table               string           `hidden:"true"`          // table name
 	Name                string           `hidden:"true"`          // the name of the model, used for relations
 	RelationshipsHolder map[string][]any `hidden:"true" json:"-"` //
+	RelationCounts      map[string]int64 `hidden:"true" json:"-"` // counts loaded with WithCount, by relation name
 
 	// key: column name
 	// value: pointer to model property
@@ -48,6 +49,21 @@ func (dbsys *SystemFields) GetRelationshipHolder(key string) []any {
 		return val
 	}
 	return []any{}
+}
+
+// SetRelationCount stores the count WithCount loaded for the relation key.
+func (dbsys *SystemFields) SetRelationCount(key string, n int64) {
+	if dbsys.RelationCounts == nil {
+		dbsys.RelationCounts = map[string]int64{}
+	}
+	dbsys.RelationCounts[key] = n
+}
+
+// RelationCount is the number of related rows of the relation name (the
+// relation method's name, e.g. "Comments"), loaded with WithCount. It is 0
+// when the row has none, and also when WithCount wasn't asked for name.
+func (dbsys *SystemFields) RelationCount(name string) int64 {
+	return dbsys.RelationCounts[name]
 }
 
 // The setter function for set the function to copy the model

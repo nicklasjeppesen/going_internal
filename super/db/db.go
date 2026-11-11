@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"maps"
 	"reflect"
 	"time"
@@ -71,13 +72,14 @@ func (activerecord *ActiveRecord[T]) ToJson() map[string]any {
 }
 
 type ParentDB[T IDB[T]] struct {
-	creator  DBCreator
-	dbChild  *T // any type
-	with     []string
-	route    string
-	callback Responsehandler
-	dbconn   DBTX
-	ctx      context.Context
+	creator   DBCreator
+	dbChild   *T // any type
+	with      []string
+	withCount []string
+	route     string
+	callback  Responsehandler
+	dbconn    DBTX
+	ctx       context.Context
 }
 
 type DataResponse[T any] struct {
@@ -205,6 +207,43 @@ func (parent *ParentDB[T]) Or(column string, value any) T {
 	return *parent.dbChild
 }
 
+// WithCount counts the named relations (relation method names, like With)
+// for every row Get or First returns, with one grouped query per relation.
+// Read the counts with RelationCount:
+//
+//	todos := Todo{}.DB(ctx).WithCount("Comments").Get()
+//	todos[0].RelationCount("Comments")
+//
+// HasMany, HasManyMorph and BelongsToMany relations can be counted; the
+// relation's own Where/WhereIn (and WherePivot) are respected.
+func (parent *ParentDB[T]) WithCount(relation ...string) T {
+	parent.withCount = append(parent.withCount, relation...)
+	return *parent.dbChild
+}
+
+// Count is the number of rows the query matches (its Where, WhereIn and Or;
+// OrderBy, Limit and OffSet are ignored). It runs in the ctx's transaction
+// like the query's other terminators.
+//
+//	open, err := Todo{}.DB(ctx).Where("completed_at", "").Count()
+func (parent *ParentDB[T]) Count() (int64, error) {
+	return parent.creator.Driver.Count_(parent.DbConn())
+}
+
+// Exists is true when the query matches at least one row (it stops at the
+// first).
+func (parent *ParentDB[T]) Exists() (bool, error) {
+	return parent.creator.Driver.Exists_(parent.DbConn())
+}
+
+// CountBy is the number of matching rows per value of column (SELECT column,
+// COUNT(*) … GROUP BY column). Values with no rows are missing from the map.
+//
+//	perList, err := Todo{}.DB(ctx).WhereIn("todolist_id", ids).CountBy("todolist_id")
+func (parent *ParentDB[T]) CountBy(column string) (map[any]int64, error) {
+	return parent.creator.Driver.CountBy_(parent.DbConn(), column)
+}
+
 //	param: value can contain maximum 2 values
 //
 // Ex. Where("id", 2) -> Where id = 2
@@ -329,6 +368,9 @@ func (parent *ParentDB[T]) First() T {
 	for _, relation := range parent.with {
 		parent.CheckingRelation(child, relation)
 	}
+	if len(parent.withCount) != 0 {
+		parent.loadCounts([]ISystemFields{child}, child)
+	}
 
 	if parent.route != "" {
 		parent.addRoutes([]T{child})
@@ -360,6 +402,31 @@ func (parent *ParentDB[T]) CheckingRelation(child T, relationkey string) {
 		if loader, ok := rawResult.(Loader); ok {
 			// 4. Call the method directly (lightning fast, no reflection here!)
 			loader.Load()
+		}
+	}
+}
+
+// counter is a relation WithCount can count.
+type counter interface {
+	CountMany(parents []ISystemFields, relationkey string) error
+}
+
+// loadCounts counts the WithCount relations of rows, calling the relation
+// methods on owner. A relation that can't be counted panics, like a wiring
+// mistake; a failing count query is logged and leaves the counts at 0, like
+// a failing read.
+func (parent *ParentDB[T]) loadCounts(rows []ISystemFields, owner T) {
+	for _, name := range parent.withCount {
+		method := reflect.ValueOf(owner).MethodByName(name)
+		if !method.IsValid() || method.Type().NumIn() != 0 || method.Type().NumOut() == 0 {
+			panic(fmt.Sprintf("db: WithCount(%q): %T has no relation method %s()", name, owner, name))
+		}
+		relation, ok := method.Call(nil)[0].Interface().(counter)
+		if !ok {
+			panic(fmt.Sprintf("db: WithCount(%q): the relation can't be counted (HasMany, HasManyMorph and BelongsToMany can)", name))
+		}
+		if err := relation.CountMany(rows, name); err != nil {
+			log.Printf("db: WithCount(%q): %v", name, err)
 		}
 	}
 }
@@ -412,6 +479,9 @@ func (parent *ParentDB[T]) Get() Collection[T] {
 		for _, value := range parent.with {
 			parent.CheckingRelationForMany(result, value)
 		}
+	}
+	if len(result) != 0 && len(parent.withCount) != 0 {
+		parent.loadCounts(result, *parent.dbChild)
 	}
 
 	if parent.route != "" {

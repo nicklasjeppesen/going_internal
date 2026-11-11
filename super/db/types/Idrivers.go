@@ -30,6 +30,12 @@ type IDrivers interface {
 	Update_(_db DBTX, columns []string, values []any) error
 	Delete_(_db DBTX, id any) error
 
+	// Counting with the query's conditions (ordering, limit and locks are
+	// ignored). Errors are returned.
+	Count_(_db DBTX) (int64, error)
+	Exists_(_db DBTX) (bool, error)
+	CountBy_(_db DBTX, column string) (map[any]int64, error) // column value → rows
+
 	// support functions
 	CreateMigrationTable() string
 	Migrate(scriptpath string) error

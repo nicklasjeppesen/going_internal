@@ -302,8 +302,8 @@ func (parent *PostgresDB) Or_(column string, value any) types.IDrivers {
 
 func (parent *PostgresDB) WhereIn_(column string, values []any) types.IDrivers {
 	if len(values) == 0 {
-		// Avoid invalid SQL like "IN ()"
-		parent.Conditions = append(parent.Conditions, "FALSE")
+		// Avoid invalid SQL like "IN ()": nothing matches an empty list.
+		parent.Conditions = append(parent.Conditions, fmt.Sprintf(" %s 1 = 0", parent.whereClause()))
 		return parent
 	}
 

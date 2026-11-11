@@ -168,9 +168,10 @@ func (belong *BelongsToManyRelation[T]) pivotsResults(ids []any) [][]any {
 	return pivotDriver.Get_(belong.Holder.DbConn(), belong.pivotColumns())
 }
 
-// Get columns for the pivot tables
+// Get columns for the pivot tables: the two keys and the Pivots columns. A
+// pivot table needs no id column of its own.
 func (belong *BelongsToManyRelation[T]) pivotColumns() []string {
-	var systemColumns = []string{"id", belong.localKey, belong.foreignKey}
+	var systemColumns = []string{belong.localKey, belong.foreignKey}
 	var accKeys = append(systemColumns, belong.pivotsColumns...)
 	return accKeys
 }
@@ -278,13 +279,18 @@ func (belong *BelongsToManyRelation[T]) attach(input map[any]map[string]any) err
 	return nil
 }
 
-func (belong *BelongsToManyRelation[T]) Detach(a ...any) error {
+// Detach removes the pivot rows between the parent and the related ids;
+// without ids it removes all of the parent's pivot rows:
+//
+//	todo.Assignees().Detach(3, 7) // DELETE … WHERE todo_id = ? AND user_id IN (3, 7)
+//	todo.Assignees().Detach()     // DELETE … WHERE todo_id = ?
+func (belong *BelongsToManyRelation[T]) Detach(ids ...any) error {
 	pivotDriver := belong.Holder.DB(belong.Holder.GetCtx()).GetDriver()
 	pivotDriver.SetTable(belong.pivotTable)
 
 	pivotDriver.Where_(belong.localKey, []any{belong.relation.PrimaryKey()})
-	for _, val := range a {
-		pivotDriver.Where_(belong.foreignKey, []any{val})
+	if len(ids) > 0 {
+		pivotDriver.WhereIn_(belong.foreignKey, ids)
 	}
 	return pivotDriver.Delete_(belong.Holder.DbConn(), nil)
 }
